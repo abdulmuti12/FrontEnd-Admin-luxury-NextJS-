@@ -92,3 +92,19 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide Next.js development indicator */
+div[data-nextjs-toast] {
+  display: none !important;
+}
+
+/* Hide the floating development panel */
+div[style*="position: fixed"][style*="z-index: 9000"] {
+  display: none !important;
+}
+
+/* Hide route announcer */
+#__next-route-announcer {
+  display: none !important;
+}
+
