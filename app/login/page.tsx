@@ -1,42 +1,59 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Eye, EyeOff, Lock, Mail } from "lucide-react"
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState(""); // State untuk pesan
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage(""); // Reset pesan
 
-    // Simulate login process
-    setTimeout(() => {
-      if (email === "email" && password === "password") {
-        // Set session flag
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("isLoggedIn", "true")
-          sessionStorage.setItem("userEmail", email)
-        }
-        // Direct navigation to dashboard
-        window.location.href = "/dashboard"
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Simpan token ke localStorage
+        localStorage.setItem("token", data.data.token);
+
+        // alert(33);
+        // Tampilkan pesan sukses
+        // setMessage(data.message || "Login berhasil!");
+
+        // Redirect ke halaman dashboard
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 2000); // Redirect setelah 2 detik
       } else {
-        alert("Invalid credentials. Use email: 'email' and password: 'password'")
+        // Tampilkan pesan error jika login gagal
+        setMessage(data.message || "Login gagal");
       }
-      setIsLoading(false)
-    }, 500)
-  }
+    } catch (error) {
+      setMessage("Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
@@ -50,6 +67,15 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {message && (
+              <p
+                className={`text-center mb-4 ${
+                  message === "Login berhasil!" ? "text-green-500" : "text-red-500"
+                }`}
+              >
+                {message}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-slate-700">
                 Email
@@ -99,11 +125,8 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-500">Demo credentials: email = "email", password = "password"</p>
-          </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
