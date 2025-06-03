@@ -18,7 +18,24 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Users, UserCheck, Shield, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Users,
+  UserCheck,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Calendar,
+  Mail,
+  User,
+  Crown,
+  Activity,
+} from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface AdminData {
   id: number
@@ -29,6 +46,19 @@ interface AdminData {
   last_login: string | null
   created_at: string
   updated_at: string
+}
+
+interface AdminDetailData {
+  general: {
+    id: number
+    name: string
+    email: string
+    role: string
+    status: string
+    last_login: string | null
+    created_at: string
+    updated_at: string
+  }
 }
 
 interface PaginationLink {
@@ -58,6 +88,13 @@ interface ApiResponse {
   status: number
 }
 
+interface DetailApiResponse {
+  success: boolean
+  message: string
+  data: AdminDetailData
+  status: number
+}
+
 export default function AdminPage() {
   const [admins, setAdmins] = useState<AdminData[]>([])
   const [searchType, setSearchType] = useState<"name" | "email">("name")
@@ -69,7 +106,11 @@ export default function AdminPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [selectedAdmin, setSelectedAdmin] = useState<AdminData | null>(null)
+  const [adminDetail, setAdminDetail] = useState<AdminDetailData | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [detailError, setDetailError] = useState("")
   const [newAdmin, setNewAdmin] = useState({
     name: "",
     email: "",
@@ -127,6 +168,50 @@ export default function AdminPage() {
       setIsLoading(false)
       setIsSearching(false)
     }
+  }
+
+  // Fetch admin detail
+  const fetchAdminDetail = async (adminId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      setIsLoadingDetail(true)
+      setDetailError("")
+      setAdminDetail(null)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data: DetailApiResponse = await response.json()
+
+      if (response.ok && data.success) {
+        setAdminDetail(data.data)
+      } else {
+        setDetailError(data.message || "Failed to load admin details")
+      }
+    } catch (error) {
+      console.error("Admin detail API error:", error)
+      setDetailError("Network error occurred while loading admin details")
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }
+
+  // Handle view detail
+  const handleViewDetail = (admin: AdminData) => {
+    setSelectedAdmin(admin)
+    setIsDetailDialogOpen(true)
+    fetchAdminDetail(admin.id)
   }
 
   // Initial load
@@ -253,6 +338,16 @@ export default function AdminPage() {
       year: "numeric",
       month: "short",
       day: "numeric",
+    })
+  }
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     })
   }
 
@@ -473,6 +568,14 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleViewDetail(admin)}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setSelectedAdmin(admin)
                             setIsEditDialogOpen(true)
@@ -551,6 +654,129 @@ export default function AdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Eye className="w-5 h-5 text-blue-600" />
+              <span>Admin Details</span>
+            </DialogTitle>
+            <DialogDescription>Detailed information about the selected admin user</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {isLoadingDetail ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                <span className="ml-3 text-slate-600">Loading admin details...</span>
+              </div>
+            ) : detailError ? (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">{detailError}</AlertDescription>
+              </Alert>
+            ) : adminDetail ? (
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
+                  <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-slate-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-slate-900">{adminDetail.general.name}</h3>
+                    <p className="text-slate-600">{adminDetail.general.email}</p>
+                    <div className="flex items-center space-x-2 mt-2">
+                      {getRoleBadge(adminDetail.general.role)}
+                      {getStatusBadge(adminDetail.general.status)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detailed Information */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Mail className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Email Address</p>
+                        <p className="text-slate-900">{adminDetail.general.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Crown className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Role</p>
+                        <p className="text-slate-900">{adminDetail.general.role}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Activity className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Status</p>
+                        <p className="text-slate-900">{adminDetail.general.status}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Calendar className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Last Login</p>
+                        <p className="text-slate-900">{formatLastLogin(adminDetail.general.last_login)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Created At</p>
+                        <p className="text-slate-900">{formatDateTime(adminDetail.general.created_at)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                      <Calendar className="w-5 h-5 text-slate-600" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Updated At</p>
+                        <p className="text-slate-900">{formatDateTime(adminDetail.general.updated_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Info */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-900 mb-2">Admin Information</h4>
+                  <div className="grid gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Admin ID:</span>
+                      <span className="text-blue-900 font-medium">#{adminDetail.general.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Account Type:</span>
+                      <span className="text-blue-900 font-medium">{adminDetail.general.role}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Account Status:</span>
+                      <span className="text-blue-900 font-medium">{adminDetail.general.status}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
