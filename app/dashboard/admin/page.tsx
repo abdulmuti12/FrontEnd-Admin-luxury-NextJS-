@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,83 +18,147 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Users, UserCheck, Shield } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Users, UserCheck, Shield, ChevronLeft, ChevronRight } from "lucide-react"
 
-// Sample admin data
-const initialAdminData = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john.doe@admin.com",
-    role: "Super Admin",
-    status: "Active",
-    lastLogin: "2024-01-15 10:30",
-    createdAt: "2024-01-01",
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane.smith@admin.com",
-    role: "Admin",
-    status: "Active",
-    lastLogin: "2024-01-15 09:15",
-    createdAt: "2024-01-02",
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "mike.johnson@admin.com",
-    role: "Moderator",
-    status: "Inactive",
-    lastLogin: "2024-01-10 14:20",
-    createdAt: "2024-01-03",
-  },
-  {
-    id: 4,
-    name: "Sarah Wilson",
-    email: "sarah.wilson@admin.com",
-    role: "Admin",
-    status: "Active",
-    lastLogin: "2024-01-15 11:45",
-    createdAt: "2024-01-04",
-  },
-  {
-    id: 5,
-    name: "David Brown",
-    email: "david.brown@admin.com",
-    role: "Moderator",
-    status: "Active",
-    lastLogin: "2024-01-14 16:30",
-    createdAt: "2024-01-05",
-  },
-]
+interface AdminData {
+  id: number
+  name: string
+  email: string
+  role: string
+  status: string
+  last_login: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface PaginationLink {
+  url: string | null
+  label: string
+  active: boolean
+}
+
+interface ApiResponse {
+  success: boolean
+  message: string
+  data: {
+    data: AdminData[]
+    current_page: number
+    from: number
+    last_page: number
+    links: PaginationLink[]
+    path: string
+    per_page: number
+    to: number
+    total: number
+    first_page_url: string
+    last_page_url: string
+    prev_page_url: string | null
+    next_page_url: string | null
+  }
+  status: number
+}
 
 export default function AdminPage() {
-  const [admins, setAdmins] = useState(initialAdminData)
+  const [admins, setAdmins] = useState<AdminData[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [selectedAdmin, setSelectedAdmin] = useState<any>(null)
+  const [selectedAdmin, setSelectedAdmin] = useState<AdminData | null>(null)
   const [newAdmin, setNewAdmin] = useState({
     name: "",
     email: "",
     role: "",
     status: "Active",
   })
+  const router = useRouter()
 
-  // Filter admins based on search term
-  const filteredAdmins = admins.filter(
-    (admin) =>
-      admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      admin.role.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Fetch admins data from API
+  const fetchAdmins = async (page = 1, search = "") => {
+    try {
+      const token = localStorage.getItem("token")
 
-  // Statistics
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      setIsSearching(true)
+
+      const params = new URLSearchParams()
+      if (page > 1) params.append("page", page.toString())
+      if (search.trim()) {
+        params.append("name", search.trim())
+        params.append("email", search.trim())
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/admin${params.toString() ? `?${params.toString()}` : ""}`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data: ApiResponse = await response.json()
+
+      if (response.ok && data.success) {
+        setAdmins(data.data.data)
+        setCurrentPage(data.data.current_page)
+        setTotalPages(data.data.last_page)
+        setTotalItems(data.data.total)
+      } else {
+        // If API returns success: false, redirect to login
+        localStorage.removeItem("token")
+        router.push("/login")
+      }
+    } catch (error) {
+      console.error("Admin API error:", error)
+      // On network error, redirect to login
+      localStorage.removeItem("token")
+      router.push("/login")
+    } finally {
+      setIsLoading(false)
+      setIsSearching(false)
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    fetchAdmins()
+  }, [])
+
+  // Handle search with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm !== "") {
+        setCurrentPage(1)
+        fetchAdmins(1, searchTerm)
+      } else {
+        fetchAdmins(1)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    fetchAdmins(page, searchTerm)
+  }
+
+  // Statistics based on current data
   const stats = [
     {
       title: "Total Admins",
-      value: admins.length.toString(),
+      value: totalItems.toString(),
       description: "All admin users",
       icon: Users,
       color: "text-blue-600",
@@ -116,13 +181,9 @@ export default function AdminPage() {
 
   const handleAddAdmin = () => {
     if (newAdmin.name && newAdmin.email && newAdmin.role) {
-      const admin = {
-        id: admins.length + 1,
-        ...newAdmin,
-        lastLogin: "Never",
-        createdAt: new Date().toISOString().split("T")[0],
-      }
-      setAdmins([...admins, admin])
+      // Here you would typically make an API call to add the admin
+      // For now, we'll just refresh the data
+      fetchAdmins(currentPage, searchTerm)
       setNewAdmin({ name: "", email: "", role: "", status: "Active" })
       setIsAddDialogOpen(false)
     }
@@ -130,7 +191,9 @@ export default function AdminPage() {
 
   const handleEditAdmin = () => {
     if (selectedAdmin) {
-      setAdmins(admins.map((admin) => (admin.id === selectedAdmin.id ? selectedAdmin : admin)))
+      // Here you would typically make an API call to update the admin
+      // For now, we'll just refresh the data
+      fetchAdmins(currentPage, searchTerm)
       setIsEditDialogOpen(false)
       setSelectedAdmin(null)
     }
@@ -138,7 +201,9 @@ export default function AdminPage() {
 
   const handleDeleteAdmin = (id: number) => {
     if (confirm("Are you sure you want to delete this admin?")) {
-      setAdmins(admins.filter((admin) => admin.id !== id))
+      // Here you would typically make an API call to delete the admin
+      // For now, we'll just refresh the data
+      fetchAdmins(currentPage, searchTerm)
     }
   }
 
@@ -159,9 +224,57 @@ export default function AdminPage() {
       Moderator: "bg-orange-100 text-orange-800",
     }
     return (
-      <Badge className={`${colors[role as keyof typeof colors]} hover:${colors[role as keyof typeof colors]}`}>
+      <Badge
+        className={`${colors[role as keyof typeof colors] || "bg-gray-100 text-gray-800"} hover:${colors[role as keyof typeof colors] || "bg-gray-100"}`}
+      >
         {role}
       </Badge>
+    )
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
+
+  const formatLastLogin = (lastLogin: string | null) => {
+    if (!lastLogin) return "Never"
+    return new Date(lastLogin).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 space-y-6 p-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Admin Management</h1>
+            <p className="text-slate-600 mt-2">Loading admin data...</p>
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          {[...Array(3)].map((_, index) => (
+            <Card key={index} className="border-slate-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-slate-200 rounded animate-pulse w-20"></div>
+                <div className="h-4 w-4 bg-slate-200 rounded animate-pulse"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-slate-200 rounded animate-pulse w-16 mb-2"></div>
+                <div className="h-3 bg-slate-200 rounded animate-pulse w-24"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     )
   }
 
@@ -263,16 +376,24 @@ export default function AdminPage() {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-slate-900">Admin Users</CardTitle>
-              <CardDescription>Manage admin accounts and permissions</CardDescription>
+              <CardDescription>
+                Showing {admins.length} of {totalItems} admin accounts
+              </CardDescription>
             </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search admins..."
+                placeholder="Search by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
+                disabled={isSearching}
               />
+              {isSearching && (
+                <div className="absolute right-3 top-3">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -290,40 +411,94 @@ export default function AdminPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAdmins.map((admin) => (
-                <TableRow key={admin.id}>
-                  <TableCell className="font-medium">{admin.name}</TableCell>
-                  <TableCell>{admin.email}</TableCell>
-                  <TableCell>{getRoleBadge(admin.role)}</TableCell>
-                  <TableCell>{getStatusBadge(admin.status)}</TableCell>
-                  <TableCell className="text-slate-600">{admin.lastLogin}</TableCell>
-                  <TableCell className="text-slate-600">{admin.createdAt}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedAdmin(admin)
-                          setIsEditDialogOpen(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteAdmin(admin.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+              {admins.length > 0 ? (
+                admins.map((admin) => (
+                  <TableRow key={admin.id}>
+                    <TableCell className="font-medium">{admin.name}</TableCell>
+                    <TableCell>{admin.email}</TableCell>
+                    <TableCell>{getRoleBadge(admin.role)}</TableCell>
+                    <TableCell>{getStatusBadge(admin.status)}</TableCell>
+                    <TableCell className="text-slate-600">{formatLastLogin(admin.last_login)}</TableCell>
+                    <TableCell className="text-slate-600">{formatDate(admin.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAdmin(admin)
+                            setIsEditDialogOpen(true)
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteAdmin(admin.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    {searchTerm ? "No admins found matching your search." : "No admin data available."}
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-slate-600">
+                Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalItems)} of {totalItems} results
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || isSearching}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = i + 1
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                        disabled={isSearching}
+                        className="w-8 h-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || isSearching}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
