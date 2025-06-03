@@ -1,25 +1,59 @@
-"use client";
+"use client"
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import type React from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState(""); // State untuk pesan
-  const router = useRouter();
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const router = useRouter()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (token) {
+      // Validate token before redirecting
+      validateTokenAndRedirect(token)
+    }
+  }, [])
+
+  const validateTokenAndRedirect = async (token: string) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/validate`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          router.push("/dashboard")
+          return
+        }
+      }
+      // If token is invalid, remove it
+      localStorage.removeItem("token")
+    } catch (error) {
+      localStorage.removeItem("token")
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setMessage(""); // Reset pesan
+    e.preventDefault()
+    setIsLoading(true)
+    setMessage("")
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/login`, {
@@ -28,32 +62,31 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email: email, password }),
-      });
+      })
 
-      const data = await response.json();
+      const data = await response.json()
 
       if (response.ok && data.success) {
-        // Simpan token ke localStorage
-        localStorage.setItem("token", data.data.token);
+        // Save token to localStorage
+        localStorage.setItem("token", data.data.token)
 
-        // alert(33);
-        // Tampilkan pesan sukses
-        // setMessage(data.message || "Login berhasil!");
+        // Show success message
+        setMessage(data.message || "Login berhasil!")
 
-        // Redirect ke halaman dashboard
+        // Redirect to dashboard
         setTimeout(() => {
-          router.push("/dashboard");
-        }, 2000); // Redirect setelah 2 detik
+          router.push("/dashboard")
+        }, 1000)
       } else {
-        // Tampilkan pesan error jika login gagal
-        setMessage(data.message || "Login gagal");
+        // Show error message
+        setMessage(data.message || "Login gagal")
       }
     } catch (error) {
-      setMessage("Terjadi kesalahan. Silakan coba lagi.");
+      setMessage("Terjadi kesalahan. Silakan coba lagi.")
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
@@ -68,13 +101,15 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {message && (
-              <p
-                className={`text-center mb-4 ${
-                  message === "Login berhasil!" ? "text-green-500" : "text-red-500"
+              <div
+                className={`p-3 rounded-lg text-center text-sm ${
+                  message.includes("berhasil") || message.includes("success")
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : "bg-red-100 text-red-800 border border-red-200"
                 }`}
               >
                 {message}
-              </p>
+              </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-slate-700">
@@ -84,12 +119,13 @@ export default function LoginPage() {
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
                   id="email"
-                  type="text"
+                  type="email"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -107,11 +143,13 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10 h-12 border-slate-200 focus:border-slate-400 focus:ring-slate-400"
                   required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                  disabled={isLoading}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -128,5 +166,5 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

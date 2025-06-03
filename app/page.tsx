@@ -1,28 +1,64 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 export default function HomePage() {
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token")
-      if (token) {
-        window.location.href = "/dashboard"
-      } else {
-        window.location.href = "/login"
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem("token")
+
+        if (!token) {
+          router.push("/login")
+          return
+        }
+
+        // Validate token with API
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/validate`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            router.push("/dashboard")
+          } else {
+            localStorage.removeItem("token")
+            router.push("/login")
+          }
+        } else {
+          localStorage.removeItem("token")
+          router.push("/login")
+        }
+      } catch (error) {
+        localStorage.removeItem("token")
+        router.push("/login")
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [])
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div>
-        <p className="mt-4 text-slate-600">Loading...</p>
+    checkAuth()
+  }, [router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Checking authentication...</p>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return null
 }

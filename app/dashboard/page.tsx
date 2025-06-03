@@ -1,23 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, ShoppingBag, Package, Tag } from "lucide-react"
 
 export default function DashboardPage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        window.location.href = "/login"
-        return
-      }
-    }
-  }, [])
-
   const stats = [
     {
       title: "Total Admins",
