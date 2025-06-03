@@ -21,34 +21,10 @@ export default function LoginPage() {
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (token) {
-      // Validate token before redirecting
-      validateTokenAndRedirect(token)
+      // Token exists, redirect to dashboard
+      router.push("/dashboard")
     }
-  }, [])
-
-  const validateTokenAndRedirect = async (token: string) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/validate`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          router.push("/dashboard")
-          return
-        }
-      }
-      // If token is invalid, remove it
-      localStorage.removeItem("token")
-    } catch (error) {
-      localStorage.removeItem("token")
-    }
-  }
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

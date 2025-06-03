@@ -1,4 +1,5 @@
 "use client"
+
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,10 +17,11 @@ export function DashboardHeader() {
   const router = useRouter()
 
   const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token")
-      window.location.href = "/login"
-    }
+    // Remove token from localStorage
+    localStorage.removeItem("token")
+
+    // Redirect to login page
+    router.push("/login")
   }
 
   return (

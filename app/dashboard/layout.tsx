@@ -17,7 +17,7 @@ export default function DashboardLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const validateAuth = async () => {
+    const checkAuth = () => {
       try {
         const token = localStorage.getItem("token")
 
@@ -26,37 +26,17 @@ export default function DashboardLayout({
           return
         }
 
-        // Validate token with API
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/validate`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            setIsAuthenticated(true)
-          } else {
-            localStorage.removeItem("token")
-            router.push("/login")
-          }
-        } else {
-          localStorage.removeItem("token")
-          router.push("/login")
-        }
+        // Token exists, user is authenticated
+        setIsAuthenticated(true)
       } catch (error) {
-        console.error("Auth validation error:", error)
-        localStorage.removeItem("token")
+        console.error("Auth check error:", error)
         router.push("/login")
       } finally {
         setIsLoading(false)
       }
     }
 
-    validateAuth()
+    checkAuth()
   }, [router])
 
   if (isLoading) {
@@ -64,7 +44,7 @@ export default function DashboardLayout({
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 mx-auto"></div>
-          <p className="mt-4 text-slate-600">Validating authentication...</p>
+          <p className="mt-4 text-slate-600">Loading dashboard...</p>
         </div>
       </div>
     )
