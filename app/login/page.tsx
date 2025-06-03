@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -67,11 +68,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
-        <CardHeader className="space-y-1 text-center pb-8">
-          <div className="mx-auto w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center mb-4">
-            <Lock className="w-6 h-6 text-white" />
+        <CardHeader className="space-y-1 text-center pb-6">
+          <div className="mx-auto flex flex-col items-center">
+            <Image src="/images/tla-logo.png" alt="The Luxury Asia Living" width={80} height={80} className="mb-2" />
+            <h1 className="text-xl font-semibold text-slate-800 mt-2">The Luxury Asia Living</h1>
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Welcome Back</CardTitle>
+          <CardTitle className="text-2xl font-bold text-slate-900 mt-4">Welcome Back</CardTitle>
           <CardDescription className="text-slate-600">Sign in to your admin account</CardDescription>
         </CardHeader>
         <CardContent>
