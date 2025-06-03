@@ -60,7 +60,8 @@ interface ApiResponse {
 
 export default function AdminPage() {
   const [admins, setAdmins] = useState<AdminData[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchType, setSearchType] = useState<"name" | "email">("name")
+  const [searchValue, setSearchValue] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -78,7 +79,7 @@ export default function AdminPage() {
   const router = useRouter()
 
   // Fetch admins data from API
-  const fetchAdmins = async (page = 1, search = "") => {
+  const fetchAdmins = async (page = 1, type: "name" | "email" = "name", value = "") => {
     try {
       const token = localStorage.getItem("token")
 
@@ -91,9 +92,8 @@ export default function AdminPage() {
 
       const params = new URLSearchParams()
       if (page > 1) params.append("page", page.toString())
-      if (search.trim()) {
-        params.append("name", search.trim())
-        params.append("email", search.trim())
+      if (value.trim()) {
+        params.append(type, value.trim())
       }
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/admin${params.toString() ? `?${params.toString()}` : ""}`
@@ -137,21 +137,37 @@ export default function AdminPage() {
   // Handle search with debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (searchTerm !== "") {
-        setCurrentPage(1)
-        fetchAdmins(1, searchTerm)
-      } else {
-        fetchAdmins(1)
-      }
+      setCurrentPage(1)
+      fetchAdmins(1, searchType, searchValue)
     }, 500)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm])
+  }, [searchValue, searchType])
 
   // Handle pagination
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchAdmins(page, searchTerm)
+    fetchAdmins(page, searchType, searchValue)
+  }
+
+  // Handle search type change
+  const handleSearchTypeChange = (type: "name" | "email") => {
+    setSearchType(type)
+    setSearchValue("") // Clear search value when changing type
+    setCurrentPage(1)
+    fetchAdmins(1, type, "")
+  }
+
+  // Handle search value change
+  const handleSearchValueChange = (value: string) => {
+    setSearchValue(value)
+  }
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchValue("")
+    setCurrentPage(1)
+    fetchAdmins(1, searchType, "")
   }
 
   // Statistics based on current data
@@ -183,7 +199,7 @@ export default function AdminPage() {
     if (newAdmin.name && newAdmin.email && newAdmin.role) {
       // Here you would typically make an API call to add the admin
       // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchTerm)
+      fetchAdmins(currentPage, searchType, searchValue)
       setNewAdmin({ name: "", email: "", role: "", status: "Active" })
       setIsAddDialogOpen(false)
     }
@@ -193,7 +209,7 @@ export default function AdminPage() {
     if (selectedAdmin) {
       // Here you would typically make an API call to update the admin
       // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchTerm)
+      fetchAdmins(currentPage, searchType, searchValue)
       setIsEditDialogOpen(false)
       setSelectedAdmin(null)
     }
@@ -203,7 +219,7 @@ export default function AdminPage() {
     if (confirm("Are you sure you want to delete this admin?")) {
       // Here you would typically make an API call to delete the admin
       // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchTerm)
+      fetchAdmins(currentPage, searchType, searchValue)
     }
   }
 
@@ -380,22 +396,54 @@ export default function AdminPage() {
                 Showing {admins.length} of {totalItems} admin accounts
               </CardDescription>
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                disabled={isSearching}
-              />
-              {isSearching && (
-                <div className="absolute right-3 top-3">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
-                </div>
-              )}
+            <div className="flex items-center space-x-2">
+              {/* Search Type Selector */}
+              <Select value={searchType} onValueChange={handleSearchTypeChange}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Search Input */}
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder={`Search by ${searchType}...`}
+                  value={searchValue}
+                  onChange={(e) => handleSearchValueChange(e.target.value)}
+                  className="pl-10 pr-10"
+                  disabled={isSearching}
+                />
+                {isSearching && (
+                  <div className="absolute right-8 top-3">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
+                  </div>
+                )}
+                {searchValue && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearSearch}
+                    className="absolute right-1 top-1 h-8 w-8 p-0 hover:bg-slate-100"
+                  >
+                    ×
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Search Info */}
+          {searchValue && (
+            <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+              Searching for "{searchValue}" in {searchType} field
+              {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <Table>
@@ -447,7 +495,9 @@ export default function AdminPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                    {searchTerm ? "No admins found matching your search." : "No admin data available."}
+                    {searchValue
+                      ? `No admins found matching "${searchValue}" in ${searchType} field.`
+                      : "No admin data available."}
                   </TableCell>
                 </TableRow>
               )}
