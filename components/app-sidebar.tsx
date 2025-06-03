@@ -93,7 +93,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-slate-200 p-4">
-        <div className="text-xs text-slate-500 text-center">© 2024 Admin Panel</div>
+        <div className="text-xs text-slate-500 text-center">© 2025 Markom Team</div>
       </SidebarFooter>
     </Sidebar>
   )
