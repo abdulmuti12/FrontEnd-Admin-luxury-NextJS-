@@ -71,9 +71,9 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center pb-6">
           <div className="mx-auto flex flex-col items-center">
             <Image src="/images/tla-logo.png" alt="The Luxury Asia Living" width={80} height={80} className="mb-2" />
-            <h1 className="text-xl font-semibold text-slate-800 mt-2">The Luxury Asia Living</h1>
+            <h1 className="text-xl font-semibold text-slate-800 mt-2">The Luxury Asia Living Admin Dashboard</h1>
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900 mt-4">Dashboard Admin</CardTitle>
+      
           <CardDescription className="text-slate-600">Sign in to your admin account</CardDescription>
         </CardHeader>
         <CardContent>
