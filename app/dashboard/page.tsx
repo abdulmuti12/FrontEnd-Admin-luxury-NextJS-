@@ -10,8 +10,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const isLoggedIn = sessionStorage.getItem("isLoggedIn")
-      if (!isLoggedIn) {
+      const token = localStorage.getItem("token")
+      if (!token) {
         window.location.href = "/login"
         return
       }

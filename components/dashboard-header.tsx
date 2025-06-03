@@ -17,8 +17,7 @@ export function DashboardHeader() {
 
   const handleLogout = () => {
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("isLoggedIn")
-      sessionStorage.removeItem("userEmail")
+      localStorage.removeItem("token")
       window.location.href = "/login"
     }
   }
