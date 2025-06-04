@@ -155,6 +155,9 @@ export default function AdminPage() {
   })
   const router = useRouter()
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [adminToDelete, setAdminToDelete] = useState<AdminData | null>(null)
+
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
     const id = Math.random().toString(36).substr(2, 9)
@@ -531,10 +534,15 @@ export default function AdminPage() {
   }
 
   const handleDeleteAdmin = (admin: AdminData) => {
-    const confirmMessage = `Are you sure you want to delete admin "${admin.name}"?\n\nThis action cannot be undone.`
+    setAdminToDelete(admin)
+    setIsDeleteDialogOpen(true)
+  }
 
-    if (confirm(confirmMessage)) {
-      deleteAdmin(admin.id, admin.name)
+  const confirmDeleteAdmin = () => {
+    if (adminToDelete) {
+      deleteAdmin(adminToDelete.id, adminToDelete.name)
+      setIsDeleteDialogOpen(false)
+      setAdminToDelete(null)
     }
   }
 
@@ -623,11 +631,11 @@ export default function AdminPage() {
   return (
     <div className="flex-1 space-y-6 p-6">
       {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+      <div className="fixed top-4 right-4 z-50 space-y-2 w-96">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+            className={`w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
               toast.type === "success" ? "border-l-4 border-green-500" : "border-l-4 border-red-500"
             }`}
           >
@@ -1165,6 +1173,63 @@ export default function AdminPage() {
               Cancel
             </Button>
             <Button onClick={handleEditAdmin}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              <span>Delete Admin</span>
+            </DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the admin account.
+            </DialogDescription>
+          </DialogHeader>
+
+          {adminToDelete && (
+            <div className="py-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-red-900">{adminToDelete.name}</p>
+                    <p className="text-sm text-red-700">{adminToDelete.email}</p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      {getRoleBadge(adminToDelete.role)}
+                      {getStatusBadge(adminToDelete.status)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> Deleting this admin will remove all associated data and cannot be recovered.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false)
+                setAdminToDelete(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteAdmin} className="bg-red-600 hover:bg-red-700">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Admin
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
