@@ -7,7 +7,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 export default function LoginPage() {
@@ -70,10 +70,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
         <CardHeader className="space-y-1 text-center pb-6">
           <div className="mx-auto flex flex-col items-center">
-            <Image src="/images/tla-logo.png" alt="The Luxury Asia Living" width={80} height={80} className="mb-2" />
-            <h1 className="text-xl font-semibold text-slate-800 mt-2">The Luxury Asia Living</h1>
+            <Image src="/images/casa-italia-logo.png" alt="Casa Italia" width={80} height={80} className="mb-2" />
+            <h1 className="text-xl font-semibold text-slate-800 mt-2">Casa Italia</h1>
           </div>
-      
+
           <CardDescription className="text-slate-600">Sign in to your admin account</CardDescription>
         </CardHeader>
         <CardContent>
