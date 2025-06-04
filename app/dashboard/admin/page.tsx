@@ -137,9 +137,7 @@ export default function AdminPage() {
   const [createMessage, setCreateMessage] = useState("")
   const [newAdmin, setNewAdmin] = useState({
     name: "",
-    full_name: "",
     email: "",
-    phone_number: "",
     password: "",
     role_id: "",
     status: "Active",
@@ -291,10 +289,8 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           name: newAdmin.name,
-          full_name: newAdmin.full_name,
           email: newAdmin.email,
           status: newAdmin.status,
-          phone_number: newAdmin.phone_number,
           password: newAdmin.password,
           role_id: Number.parseInt(newAdmin.role_id),
         }),
@@ -307,9 +303,7 @@ export default function AdminPage() {
         // Reset form
         setNewAdmin({
           name: "",
-          full_name: "",
           email: "",
-          phone_number: "",
           password: "",
           role_id: "",
           status: "Active",
@@ -349,9 +343,7 @@ export default function AdminPage() {
       // Reset form when closing
       setNewAdmin({
         name: "",
-        full_name: "",
         email: "",
-        phone_number: "",
         password: "",
         role_id: "",
         status: "Active",
@@ -427,14 +419,7 @@ export default function AdminPage() {
   ]
 
   const handleAddAdmin = () => {
-    if (
-      newAdmin.name &&
-      newAdmin.full_name &&
-      newAdmin.email &&
-      newAdmin.phone_number &&
-      newAdmin.password &&
-      newAdmin.role_id
-    ) {
+    if (newAdmin.name && newAdmin.email && newAdmin.password && newAdmin.role_id) {
       createAdmin()
     } else {
       setCreateMessage("Please fill in all required fields")
@@ -577,23 +562,12 @@ export default function AdminPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="name">Username *</Label>
+                <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
                   value={newAdmin.name}
                   onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                  placeholder="Enter username"
-                  disabled={isCreatingAdmin}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="full_name">Full Name *</Label>
-                <Input
-                  id="full_name"
-                  value={newAdmin.full_name}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, full_name: e.target.value })}
-                  placeholder="Enter full name"
+                  placeholder="Enter name"
                   disabled={isCreatingAdmin}
                 />
               </div>
@@ -606,17 +580,6 @@ export default function AdminPage() {
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                   placeholder="Enter email address"
-                  disabled={isCreatingAdmin}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="phone_number">Phone Number *</Label>
-                <Input
-                  id="phone_number"
-                  value={newAdmin.phone_number}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, phone_number: e.target.value })}
-                  placeholder="Enter phone number"
                   disabled={isCreatingAdmin}
                 />
               </div>
