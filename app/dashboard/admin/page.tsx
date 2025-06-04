@@ -274,6 +274,7 @@ export default function AdminPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        setCreateMessage("Authentication token not found. Please login again.")
         router.push("/login")
         return
       }
@@ -281,11 +282,22 @@ export default function AdminPage() {
       setIsCreatingAdmin(true)
       setCreateMessage("")
 
+      // Debug: Log the request details
+      console.log("Creating admin with token:", token ? "Token exists" : "No token")
+      console.log("Request payload:", {
+        name: newAdmin.name,
+        email: newAdmin.email,
+        status: newAdmin.status,
+        password: newAdmin.password,
+        role_id: Number.parseInt(newAdmin.role_id),
+      })
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           name: newAdmin.name,
@@ -296,7 +308,19 @@ export default function AdminPage() {
         }),
       })
 
+      // Debug: Log response details
+      console.log("Response status:", response.status)
+      console.log("Response headers:", response.headers)
+
       const data: CreateAdminResponse = await response.json()
+      console.log("Response data:", data)
+
+      if (response.status === 401) {
+        setCreateMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
 
       if (response.ok && data.success) {
         setCreateMessage("Admin created successfully!")
@@ -316,7 +340,7 @@ export default function AdminPage() {
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || "Failed to create admin")
+        setCreateMessage(data.message || `Failed to create admin (Status: ${response.status})`)
       }
     } catch (error) {
       console.error("Create admin API error:", error)
