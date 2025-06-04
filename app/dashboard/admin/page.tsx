@@ -34,6 +34,9 @@ import {
   User,
   Crown,
   Activity,
+  CheckCircle,
+  XCircle,
+  X,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -114,6 +117,13 @@ interface CreateAdminResponse {
   status: number
 }
 
+interface ToastNotification {
+  id: string
+  type: "success" | "error"
+  title: string
+  message: string
+}
+
 export default function AdminPage() {
   const [admins, setAdmins] = useState<AdminData[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
@@ -135,6 +145,7 @@ export default function AdminPage() {
   const [detailError, setDetailError] = useState("")
   const [roleError, setRoleError] = useState("")
   const [createMessage, setCreateMessage] = useState("")
+  const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [newAdmin, setNewAdmin] = useState({
     name: "",
     email: "",
@@ -143,6 +154,22 @@ export default function AdminPage() {
     status: "Active",
   })
   const router = useRouter()
+
+  // Toast notification functions
+  const addToast = (type: "success" | "error", title: string, message: string) => {
+    const id = Math.random().toString(36).substr(2, 9)
+    const newToast: ToastNotification = { id, type, title, message }
+    setToasts((prev) => [...prev, newToast])
+
+    // Auto remove toast after 5 seconds
+    setTimeout(() => {
+      removeToast(id)
+    }, 5000)
+  }
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id))
+  }
 
   // Fetch admins data from API
   const fetchAdmins = async (page = 1, type: "name" | "email" = "name", value = "") => {
@@ -461,7 +488,7 @@ export default function AdminPage() {
   }
 
   // Delete admin
-  const deleteAdmin = async (adminId: number) => {
+  const deleteAdmin = async (adminId: number, adminName: string) => {
     try {
       const token = localStorage.getItem("token")
 
@@ -488,15 +515,18 @@ export default function AdminPage() {
       }
 
       if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Admin Deleted", `Admin "${adminName}" has been successfully deleted.`)
         // Refresh admin list after successful deletion
         fetchAdmins(currentPage, searchType, searchValue)
-        // You could also show a success message here if needed
       } else {
-        alert(data.message || "Failed to delete admin")
+        // Show error toast
+        addToast("error", "Delete Failed", data.message || "Failed to delete admin. Please try again.")
       }
     } catch (error) {
       console.error("Delete admin API error:", error)
-      alert("Network error occurred while deleting admin")
+      // Show error toast for network errors
+      addToast("error", "Network Error", "A network error occurred while deleting the admin. Please try again.")
     }
   }
 
@@ -504,7 +534,7 @@ export default function AdminPage() {
     const confirmMessage = `Are you sure you want to delete admin "${admin.name}"?\n\nThis action cannot be undone.`
 
     if (confirm(confirmMessage)) {
-      deleteAdmin(admin.id)
+      deleteAdmin(admin.id, admin.name)
     }
   }
 
@@ -592,6 +622,43 @@ export default function AdminPage() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+              toast.type === "success" ? "border-l-4 border-green-500" : "border-l-4 border-red-500"
+            }`}
+          >
+            <div className="p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  {toast.type === "success" ? (
+                    <CheckCircle className="h-6 w-6 text-green-400" />
+                  ) : (
+                    <XCircle className="h-6 w-6 text-red-400" />
+                  )}
+                </div>
+                <div className="ml-3 w-0 flex-1 pt-0.5">
+                  <p className="text-sm font-medium text-gray-900">{toast.title}</p>
+                  <p className="mt-1 text-sm text-gray-500">{toast.message}</p>
+                </div>
+                <div className="ml-4 flex-shrink-0 flex">
+                  <button
+                    className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    onClick={() => removeToast(toast.id)}
+                  >
+                    <span className="sr-only">Close</span>
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
