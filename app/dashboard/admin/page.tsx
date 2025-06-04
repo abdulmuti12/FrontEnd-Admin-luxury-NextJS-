@@ -460,11 +460,51 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteAdmin = (id: number) => {
-    if (confirm("Are you sure you want to delete this admin?")) {
-      // Here you would typically make an API call to delete the admin
-      // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchType, searchValue)
+  // Delete admin
+  const deleteAdmin = async (adminId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Refresh admin list after successful deletion
+        fetchAdmins(currentPage, searchType, searchValue)
+        // You could also show a success message here if needed
+      } else {
+        alert(data.message || "Failed to delete admin")
+      }
+    } catch (error) {
+      console.error("Delete admin API error:", error)
+      alert("Network error occurred while deleting admin")
+    }
+  }
+
+  const handleDeleteAdmin = (admin: AdminData) => {
+    const confirmMessage = `Are you sure you want to delete admin "${admin.name}"?\n\nThis action cannot be undone.`
+
+    if (confirm(confirmMessage)) {
+      deleteAdmin(admin.id)
     }
   }
 
@@ -801,7 +841,7 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteAdmin(admin.id)}
+                          onClick={() => handleDeleteAdmin(admin)}
                           className="text-red-600 hover:text-red-800"
                         >
                           <Trash2 className="w-4 h-4" />
