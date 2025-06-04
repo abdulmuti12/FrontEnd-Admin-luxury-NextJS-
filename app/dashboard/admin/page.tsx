@@ -61,6 +61,11 @@ interface AdminDetailData {
   }
 }
 
+interface RoleData {
+  id: number
+  name: string
+}
+
 interface PaginationLink {
   url: string | null
   label: string
@@ -95,8 +100,23 @@ interface DetailApiResponse {
   status: number
 }
 
+interface RoleApiResponse {
+  success: boolean
+  message: string
+  data: RoleData[]
+  status: number
+}
+
+interface CreateAdminResponse {
+  success: boolean
+  message: string
+  data?: any
+  status: number
+}
+
 export default function AdminPage() {
   const [admins, setAdmins] = useState<AdminData[]>([])
+  const [roles, setRoles] = useState<RoleData[]>([])
   const [searchType, setSearchType] = useState<"name" | "email">("name")
   const [searchValue, setSearchValue] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -110,11 +130,18 @@ export default function AdminPage() {
   const [selectedAdmin, setSelectedAdmin] = useState<AdminData | null>(null)
   const [adminDetail, setAdminDetail] = useState<AdminDetailData | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false)
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false)
   const [detailError, setDetailError] = useState("")
+  const [roleError, setRoleError] = useState("")
+  const [createMessage, setCreateMessage] = useState("")
   const [newAdmin, setNewAdmin] = useState({
     name: "",
+    full_name: "",
     email: "",
-    role: "",
+    phone_number: "",
+    password: "",
+    role_id: "",
     status: "Active",
   })
   const router = useRouter()
@@ -170,6 +197,42 @@ export default function AdminPage() {
     }
   }
 
+  // Fetch roles data from API
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      setIsLoadingRoles(true)
+      setRoleError("")
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-role`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data: RoleApiResponse = await response.json()
+
+      if (response.ok && data.success) {
+        setRoles(data.data)
+      } else {
+        setRoleError(data.message || "Failed to load roles")
+      }
+    } catch (error) {
+      console.error("Roles API error:", error)
+      setRoleError("Network error occurred while loading roles")
+    } finally {
+      setIsLoadingRoles(false)
+    }
+  }
+
   // Fetch admin detail
   const fetchAdminDetail = async (adminId: number) => {
     try {
@@ -207,11 +270,94 @@ export default function AdminPage() {
     }
   }
 
+  // Create new admin
+  const createAdmin = async () => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      setIsCreatingAdmin(true)
+      setCreateMessage("")
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newAdmin.name,
+          full_name: newAdmin.full_name,
+          email: newAdmin.email,
+          status: newAdmin.status,
+          phone_number: newAdmin.phone_number,
+          password: newAdmin.password,
+          role_id: Number.parseInt(newAdmin.role_id),
+        }),
+      })
+
+      const data: CreateAdminResponse = await response.json()
+
+      if (response.ok && data.success) {
+        setCreateMessage("Admin created successfully!")
+        // Reset form
+        setNewAdmin({
+          name: "",
+          full_name: "",
+          email: "",
+          phone_number: "",
+          password: "",
+          role_id: "",
+          status: "Active",
+        })
+        // Refresh admin list
+        fetchAdmins(currentPage, searchType, searchValue)
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setIsAddDialogOpen(false)
+          setCreateMessage("")
+        }, 2000)
+      } else {
+        setCreateMessage(data.message || "Failed to create admin")
+      }
+    } catch (error) {
+      console.error("Create admin API error:", error)
+      setCreateMessage("Network error occurred while creating admin")
+    } finally {
+      setIsCreatingAdmin(false)
+    }
+  }
+
   // Handle view detail
   const handleViewDetail = (admin: AdminData) => {
     setSelectedAdmin(admin)
     setIsDetailDialogOpen(true)
     fetchAdminDetail(admin.id)
+  }
+
+  // Handle add dialog open
+  const handleAddDialogOpen = (open: boolean) => {
+    setIsAddDialogOpen(open)
+    if (open) {
+      fetchRoles() // Fetch roles when opening add dialog
+      setCreateMessage("")
+    } else {
+      // Reset form when closing
+      setNewAdmin({
+        name: "",
+        full_name: "",
+        email: "",
+        phone_number: "",
+        password: "",
+        role_id: "",
+        status: "Active",
+      })
+      setCreateMessage("")
+    }
   }
 
   // Initial load
@@ -281,12 +427,17 @@ export default function AdminPage() {
   ]
 
   const handleAddAdmin = () => {
-    if (newAdmin.name && newAdmin.email && newAdmin.role) {
-      // Here you would typically make an API call to add the admin
-      // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchType, searchValue)
-      setNewAdmin({ name: "", email: "", role: "", status: "Active" })
-      setIsAddDialogOpen(false)
+    if (
+      newAdmin.name &&
+      newAdmin.full_name &&
+      newAdmin.email &&
+      newAdmin.phone_number &&
+      newAdmin.password &&
+      newAdmin.role_id
+    ) {
+      createAdmin()
+    } else {
+      setCreateMessage("Please fill in all required fields")
     }
   }
 
@@ -323,6 +474,7 @@ export default function AdminPage() {
       "Super Admin": "bg-purple-100 text-purple-800",
       Admin: "bg-blue-100 text-blue-800",
       Moderator: "bg-orange-100 text-orange-800",
+      Editor: "bg-green-100 text-green-800",
     }
     return (
       <Badge
@@ -397,54 +549,128 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold text-slate-900">Admin Management</h1>
           <p className="text-slate-600 mt-2">Manage admin users and their permissions</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <Dialog open={isAddDialogOpen} onOpenChange={handleAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-slate-900 hover:bg-slate-800">
               <Plus className="w-4 h-4 mr-2" />
               Add Admin
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add New Admin</DialogTitle>
               <DialogDescription>Create a new admin user account</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-96 overflow-y-auto">
+              {createMessage && (
+                <Alert
+                  className={
+                    createMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                  }
+                >
+                  <AlertDescription
+                    className={createMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
+                  >
+                    {createMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid gap-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">Username *</Label>
                 <Input
                   id="name"
                   value={newAdmin.name}
                   onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                  placeholder="Enter full name"
+                  placeholder="Enter username"
+                  disabled={isCreatingAdmin}
                 />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="full_name">Full Name *</Label>
+                <Input
+                  id="full_name"
+                  value={newAdmin.full_name}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, full_name: e.target.value })}
+                  placeholder="Enter full name"
+                  disabled={isCreatingAdmin}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={newAdmin.email}
                   onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                   placeholder="Enter email address"
+                  disabled={isCreatingAdmin}
                 />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={newAdmin.role} onValueChange={(value) => setNewAdmin({ ...newAdmin, role: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Super Admin">Super Admin</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Moderator">Moderator</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="phone_number">Phone Number *</Label>
+                <Input
+                  id="phone_number"
+                  value={newAdmin.phone_number}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, phone_number: e.target.value })}
+                  placeholder="Enter phone number"
+                  disabled={isCreatingAdmin}
+                />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={newAdmin.status} onValueChange={(value) => setNewAdmin({ ...newAdmin, status: value })}>
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newAdmin.password}
+                  onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                  placeholder="Enter password"
+                  disabled={isCreatingAdmin}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role *</Label>
+                {isLoadingRoles ? (
+                  <div className="flex items-center space-x-2 p-2 border rounded">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
+                    <span className="text-sm text-slate-600">Loading roles...</span>
+                  </div>
+                ) : roleError ? (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-800">{roleError}</AlertDescription>
+                  </Alert>
+                ) : (
+                  <Select
+                    value={newAdmin.role_id}
+                    onValueChange={(value) => setNewAdmin({ ...newAdmin, role_id: value })}
+                    disabled={isCreatingAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status *</Label>
+                <Select
+                  value={newAdmin.status}
+                  onValueChange={(value) => setNewAdmin({ ...newAdmin, status: value })}
+                  disabled={isCreatingAdmin}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -456,10 +682,12 @@ export default function AdminPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <Button variant="outline" onClick={() => handleAddDialogOpen(false)} disabled={isCreatingAdmin}>
                 Cancel
               </Button>
-              <Button onClick={handleAddAdmin}>Add Admin</Button>
+              <Button onClick={handleAddAdmin} disabled={isCreatingAdmin}>
+                {isCreatingAdmin ? "Creating..." : "Create Admin"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -817,6 +1045,7 @@ export default function AdminPage() {
                     <SelectItem value="Super Admin">Super Admin</SelectItem>
                     <SelectItem value="Admin">Admin</SelectItem>
                     <SelectItem value="Moderator">Moderator</SelectItem>
+                    <SelectItem value="Editor">Editor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
