@@ -975,14 +975,21 @@ export default function AdminPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
+                          onClick={async () => {
+                            // Fetch roles first if not already loaded
+                            if (roles.length === 0) {
+                              await fetchRoles()
+                            }
+
+                            // Find the role_id based on the current role name
+                            const currentRole = roles.find((role) => role.name === admin.role)
+
                             setSelectedAdmin({
                               ...admin,
                               password: "", // Add password field
-                              role_id: "", // Add role_id field
+                              role_id: currentRole ? currentRole.id.toString() : "", // Map role name to role_id
                             })
                             setIsEditDialogOpen(true)
-                            fetchRoles() // Fetch roles when opening edit dialog
                             setEditMessage("")
                           }}
                         >
