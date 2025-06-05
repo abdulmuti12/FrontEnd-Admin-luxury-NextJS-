@@ -70,8 +70,14 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">
         <CardHeader className="space-y-1 text-center pb-6">
           <div className="mx-auto flex flex-col items-center">
-            <Image src="/images/casa-italia-logo.png" alt="Casa Italia" width={80} height={80} className="mb-2" />
-            <h1 className="text-xl font-semibold text-slate-800 mt-2">Casa Italia</h1>
+            <Image
+              src="/images/casa-italia-logo.png"
+              alt="Casa Italia"
+              width={200}
+              height={100}
+              className="mb-4"
+              style={{ objectFit: "contain" }}
+            />
           </div>
 
           <CardDescription className="text-slate-600">Sign in to your admin account</CardDescription>
