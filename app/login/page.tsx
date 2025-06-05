@@ -73,8 +73,8 @@ export default function LoginPage() {
             <Image
               src="/images/casa-italia-logo.png"
               alt="Casa Italia"
-              width={200}
-              height={100}
+              width={140}
+              height={70}
               className="mb-4"
               style={{ objectFit: "contain" }}
             />
