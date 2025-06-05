@@ -49,6 +49,8 @@ interface AdminData {
   last_login: string | null
   created_at: string
   updated_at: string
+  password?: string // Add optional password field
+  role_id?: string // Add optional role_id field
 }
 
 interface AdminDetailData {
@@ -157,6 +159,9 @@ export default function AdminPage() {
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [adminToDelete, setAdminToDelete] = useState<AdminData | null>(null)
+
+  const [isEditingAdmin, setIsEditingAdmin] = useState(false)
+  const [editMessage, setEditMessage] = useState("")
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -480,13 +485,77 @@ export default function AdminPage() {
     }
   }
 
+  // Update admin
+  const updateAdmin = async (adminId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setEditMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      setIsEditingAdmin(true)
+      setEditMessage("")
+
+      if (!selectedAdmin) {
+        setEditMessage("No admin selected for editing")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/admin/${adminId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          name: selectedAdmin.name,
+          email: selectedAdmin.email,
+          status: selectedAdmin.status,
+          password: selectedAdmin.password || "password", // Default password if not provided
+          role_id: Number.parseInt(selectedAdmin.role_id || "1"),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        setEditMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Admin Updated", `Admin "${selectedAdmin.name}" has been successfully updated.`)
+        // Refresh admin list
+        fetchAdmins(currentPage, searchType, searchValue)
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setIsEditDialogOpen(false)
+          setSelectedAdmin(null)
+          setEditMessage("")
+        }, 1000)
+      } else {
+        setEditMessage(data.message || `Failed to update admin (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Update admin API error:", error)
+      setEditMessage("Network error occurred while updating admin")
+    } finally {
+      setIsEditingAdmin(false)
+    }
+  }
+
   const handleEditAdmin = () => {
-    if (selectedAdmin) {
-      // Here you would typically make an API call to update the admin
-      // For now, we'll just refresh the data
-      fetchAdmins(currentPage, searchType, searchValue)
-      setIsEditDialogOpen(false)
-      setSelectedAdmin(null)
+    if (selectedAdmin && selectedAdmin.name && selectedAdmin.email && selectedAdmin.role_id) {
+      updateAdmin(selectedAdmin.id)
+    } else {
+      setEditMessage("Please fill in all required fields")
     }
   }
 
@@ -907,8 +976,14 @@ export default function AdminPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
-                            setSelectedAdmin(admin)
+                            setSelectedAdmin({
+                              ...admin,
+                              password: "", // Add password field
+                              role_id: "", // Add role_id field
+                            })
                             setIsEditDialogOpen(true)
+                            fetchRoles() // Fetch roles when opening edit dialog
+                            setEditMessage("")
                           }}
                         >
                           <Edit className="w-4 h-4" />
@@ -1109,53 +1184,109 @@ export default function AdminPage() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            setSelectedAdmin(null)
+            setEditMessage("")
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Admin</DialogTitle>
             <DialogDescription>Update admin user information</DialogDescription>
           </DialogHeader>
           {selectedAdmin && (
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-96 overflow-y-auto">
+              {editMessage && (
+                <Alert
+                  className={
+                    editMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                  }
+                >
+                  <AlertDescription
+                    className={editMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
+                  >
+                    {editMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid gap-2">
-                <Label htmlFor="edit-name">Full Name</Label>
+                <Label htmlFor="edit-name">Name *</Label>
                 <Input
                   id="edit-name"
                   value={selectedAdmin.name}
                   onChange={(e) => setSelectedAdmin({ ...selectedAdmin, name: e.target.value })}
+                  placeholder="Enter name"
+                  disabled={isEditingAdmin}
                 />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="edit-email">Email</Label>
+                <Label htmlFor="edit-email">Email *</Label>
                 <Input
                   id="edit-email"
                   type="email"
                   value={selectedAdmin.email}
                   onChange={(e) => setSelectedAdmin({ ...selectedAdmin, email: e.target.value })}
+                  placeholder="Enter email address"
+                  disabled={isEditingAdmin}
                 />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="edit-role">Role</Label>
-                <Select
-                  value={selectedAdmin.role}
-                  onValueChange={(value) => setSelectedAdmin({ ...selectedAdmin, role: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Super Admin">Super Admin</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Moderator">Moderator</SelectItem>
-                    <SelectItem value="Editor">Editor</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="edit-password">Password *</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  value={selectedAdmin.password || ""}
+                  onChange={(e) => setSelectedAdmin({ ...selectedAdmin, password: e.target.value })}
+                  placeholder="Enter new password"
+                  disabled={isEditingAdmin}
+                />
               </div>
+
               <div className="grid gap-2">
-                <Label htmlFor="edit-status">Status</Label>
+                <Label htmlFor="edit-role">Role *</Label>
+                {isLoadingRoles ? (
+                  <div className="flex items-center space-x-2 p-2 border rounded">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
+                    <span className="text-sm text-slate-600">Loading roles...</span>
+                  </div>
+                ) : roleError ? (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-800">{roleError}</AlertDescription>
+                  </Alert>
+                ) : (
+                  <Select
+                    value={selectedAdmin.role_id || ""}
+                    onValueChange={(value) => setSelectedAdmin({ ...selectedAdmin, role_id: value })}
+                    disabled={isEditingAdmin}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-status">Status *</Label>
                 <Select
                   value={selectedAdmin.status}
                   onValueChange={(value) => setSelectedAdmin({ ...selectedAdmin, status: value })}
+                  disabled={isEditingAdmin}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1169,10 +1300,20 @@ export default function AdminPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false)
+                setSelectedAdmin(null)
+                setEditMessage("")
+              }}
+              disabled={isEditingAdmin}
+            >
               Cancel
             </Button>
-            <Button onClick={handleEditAdmin}>Save Changes</Button>
+            <Button onClick={handleEditAdmin} disabled={isEditingAdmin}>
+              {isEditingAdmin ? "Updating..." : "Update Admin"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
