@@ -194,8 +194,8 @@ export default function RolePage() {
     } catch (error) {
       console.error("Role API error:", error)
       // On network error, redirect to login
-      localStorage.removeItem("token")
-      router.push("/login")
+      // localStorage.removeItem("token")
+      // router.push("/login")
     } finally {
       setIsLoading(false)
       setIsSearching(false)
@@ -208,8 +208,8 @@ export default function RolePage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        router.push("/login")
-        return
+        // router.push("/login")
+        // return
       }
 
       setIsLoadingDetail(true)
@@ -245,9 +245,9 @@ export default function RolePage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
-        return
+        // setCreateMessage("Authentication token not found. Please login again.")
+        // router.push("/login")
+        // return
       }
 
       setIsCreatingRole(true)
@@ -269,10 +269,10 @@ export default function RolePage() {
       const data: CreateRoleResponse = await response.json()
 
       if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
+        // setCreateMessage("Authentication failed. Please login again.")
+        // localStorage.removeItem("token")
+        // router.push("/login")
+        // return
       }
 
       if (response.ok && data.success) {
