@@ -39,11 +39,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 interface RoleData {
   id: number
   name: string
-  description?: string
-  permissions?: string[]
   created_at: string
   updated_at: string
-  admin_count?: number
 }
 
 interface RoleDetailData {
@@ -64,8 +61,8 @@ interface PaginationLink {
 }
 
 interface ApiResponse {
-  success: boolean
-  message: string
+  success?: boolean
+  message?: string
   data: {
     data: RoleData[]
     current_page: number
@@ -76,12 +73,23 @@ interface ApiResponse {
     per_page: number
     to: number
     total: number
-    first_page_url: string
-    last_page_url: string
-    prev_page_url: string | null
-    next_page_url: string | null
   }
-  status: number
+  meta: {
+    current_page: number
+    from: number
+    last_page: number
+    links: PaginationLink[]
+    path: string
+    per_page: number
+    to: number
+    total: number
+  }
+  links: {
+    first: string
+    last: string
+    prev: string | null
+    next: string | null
+  }
 }
 
 interface DetailApiResponse {
@@ -125,7 +133,6 @@ export default function RolePage() {
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [newRole, setNewRole] = useState({
     name: "",
-    description: "",
   })
   const router = useRouter()
 
@@ -181,21 +188,37 @@ export default function RolePage() {
 
       const data: ApiResponse = await response.json()
 
-      if (response.ok && data.success) {
-        setRoles(data.data.data)
-        setCurrentPage(data.data.current_page)
-        setTotalPages(data.data.last_page)
-        setTotalItems(data.data.total)
+      if (response.ok) {
+        // Handle successful response
+        if (data.data && data.data.data) {
+          setRoles(data.data.data)
+          setCurrentPage(data.meta.current_page)
+          setTotalPages(data.meta.last_page)
+          setTotalItems(data.meta.total)
+        } else {
+          // Handle case where data structure is different
+          setRoles([])
+          setCurrentPage(1)
+          setTotalPages(1)
+          setTotalItems(0)
+        }
       } else {
-        // If API returns success: false, redirect to login
-        localStorage.removeItem("token")
-        router.push("/login")
+        // Handle error response
+        if (data.message) {
+          addToast("error", "Error", data.message)
+        }
+        // If unauthorized, redirect to login
+        if (response.status === 401) {
+          localStorage.removeItem("token")
+          router.push("/login")
+        }
       }
     } catch (error) {
       console.error("Role API error:", error)
+      addToast("error", "Network Error", "Failed to fetch roles. Please try again.")
       // On network error, redirect to login
-      // localStorage.removeItem("token")
-      // router.push("/login")
+      localStorage.removeItem("token")
+      router.push("/login")
     } finally {
       setIsLoading(false)
       setIsSearching(false)
@@ -208,8 +231,8 @@ export default function RolePage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        // router.push("/login")
-        // return
+        router.push("/login")
+        return
       }
 
       setIsLoadingDetail(true)
@@ -245,9 +268,9 @@ export default function RolePage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        // setCreateMessage("Authentication token not found. Please login again.")
-        // router.push("/login")
-        // return
+        setCreateMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
       }
 
       setIsCreatingRole(true)
@@ -262,25 +285,23 @@ export default function RolePage() {
         },
         body: JSON.stringify({
           name: newRole.name,
-          description: newRole.description,
         }),
       })
 
-      const data: CreateRoleResponse = await response.json()
+      const data = await response.json()
 
       if (response.status === 401) {
-        // setCreateMessage("Authentication failed. Please login again.")
-        // localStorage.removeItem("token")
-        // router.push("/login")
-        // return
+        setCreateMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
       }
 
-      if (response.ok && data.success) {
+      if (response.ok) {
         setCreateMessage("Role created successfully!")
         // Reset form
         setNewRole({
           name: "",
-          description: "",
         })
         // Refresh role list
         fetchRoles(currentPage, searchValue)
@@ -316,7 +337,6 @@ export default function RolePage() {
       // Reset form when closing
       setNewRole({
         name: "",
-        description: "",
       })
       setCreateMessage("")
     }
@@ -659,17 +679,6 @@ export default function RolePage() {
                   disabled={isCreatingRole}
                 />
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={newRole.description}
-                  onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
-                  placeholder="Enter role description (optional)"
-                  disabled={isCreatingRole}
-                />
-              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => handleAddDialogOpen(false)} disabled={isCreatingRole}>
@@ -752,7 +761,6 @@ export default function RolePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Role Name</TableHead>
-                <TableHead>Description</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -765,7 +773,6 @@ export default function RolePage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center space-x-2">{getRoleBadge(role.name)}</div>
                     </TableCell>
-                    <TableCell className="text-slate-600">{role.description || "No description"}</TableCell>
                     <TableCell className="text-slate-600">{formatDate(role.created_at)}</TableCell>
                     <TableCell className="text-slate-600">{formatDate(role.updated_at)}</TableCell>
                     <TableCell className="text-right">
@@ -803,7 +810,7 @@ export default function RolePage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={4} className="text-center py-8 text-slate-500">
                     {searchValue ? `No roles found matching "${searchValue}".` : "No role data available."}
                   </TableCell>
                 </TableRow>
