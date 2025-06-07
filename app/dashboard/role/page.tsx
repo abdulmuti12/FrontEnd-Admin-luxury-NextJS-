@@ -43,6 +43,17 @@ interface RoleData {
   updated_at: string
 }
 
+interface RoleDetailData {
+  general: {
+    id: number
+    name: string
+    description?: string
+    permissions?: string[]
+    created_at: string
+    updated_at: string
+  }
+}
+
 interface PaginationLink {
   url: string | null
   label: string
@@ -50,8 +61,6 @@ interface PaginationLink {
 }
 
 interface ApiResponse {
-  success?: boolean
-  message?: string
   data: {
     data: RoleData[]
   }
@@ -73,10 +82,18 @@ interface ApiResponse {
   }
 }
 
+interface DetailApiResponse {
+  success: boolean
+  message: string
+  data: RoleDetailData
+  status: number
+}
+
 interface CreateRoleResponse {
   success: boolean
   message: string
   data?: any
+  status: number
 }
 
 interface ToastNotification {
@@ -98,7 +115,10 @@ export default function RolePage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<RoleData | null>(null)
+  const [roleDetail, setRoleDetail] = useState<RoleDetailData | null>(null)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [isCreatingRole, setIsCreatingRole] = useState(false)
+  const [detailError, setDetailError] = useState("")
   const [createMessage, setCreateMessage] = useState("")
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [newRole, setNewRole] = useState({
@@ -173,35 +193,13 @@ export default function RolePage() {
       const responseData: ApiResponse = await response.json()
       console.log("API Response:", responseData)
 
-      // Handle successful response
       if (response.ok) {
-        // Check if response has success field and it's false
-        if (responseData.success === false) {
-          setApiError(responseData.message || "API returned success: false")
-          addToast("error", "Error", responseData.message || "Failed to fetch roles")
-          setRoles([])
-          setCurrentPage(1)
-          setTotalPages(1)
-          setTotalItems(0)
-          return
-        }
-
-        // Extract data from the nested structure: data.data
-        if (responseData.data && responseData.data.data && Array.isArray(responseData.data.data)) {
-          const rolesList = responseData.data.data
-
-          // Extract pagination info from meta
-          const currentPageNum = responseData.meta.current_page
-          const lastPageNum = responseData.meta.last_page
-          const totalItemsNum = responseData.meta.total
-
-          setRoles(rolesList)
-          setCurrentPage(currentPageNum)
-          setTotalPages(lastPageNum)
-          setTotalItems(totalItemsNum)
-
-          console.log("Roles loaded:", rolesList.length)
-          console.log("Pagination:", { currentPageNum, lastPageNum, totalItemsNum })
+        // Extract data from the correct structure
+        if (responseData.data && responseData.data.data) {
+          setRoles(responseData.data.data)
+          setCurrentPage(responseData.meta.current_page)
+          setTotalPages(responseData.meta.last_page)
+          setTotalItems(responseData.meta.total)
         } else {
           console.error("Unexpected API response structure:", responseData)
           setApiError("Received unexpected data format from server")
@@ -209,22 +207,61 @@ export default function RolePage() {
         }
       } else {
         // Handle error response
-        if (responseData.message) {
-          setApiError(responseData.message)
-          addToast("error", "Error", responseData.message)
-        } else {
-          setApiError(`Error: ${response.status} ${response.statusText}`)
-        }
+        setApiError(`Error: ${response.status} ${response.statusText}`)
         setRoles([])
       }
     } catch (error) {
       console.error("Role API error:", error)
       setApiError("Network error occurred while fetching roles")
-      addToast("error", "Network Error", "Failed to fetch roles. Please check your connection.")
+      addToast("error", "Network Error", "Failed to fetch roles. Please try again.")
       setRoles([])
     } finally {
       setIsLoading(false)
       setIsSearching(false)
+    }
+  }
+
+  // Fetch role detail
+  const fetchRoleDetail = async (roleId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      setIsLoadingDetail(true)
+      setDetailError("")
+      setRoleDetail(null)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role/${roleId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      // Only redirect to login if we get a 401 Unauthorized
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setRoleDetail(data.data)
+      } else {
+        setDetailError(data.message || "Failed to load role details")
+      }
+    } catch (error) {
+      console.error("Role detail API error:", error)
+      setDetailError("Network error occurred while loading role details")
+    } finally {
+      setIsLoadingDetail(false)
     }
   }
 
@@ -254,7 +291,7 @@ export default function RolePage() {
         }),
       })
 
-      const data: CreateRoleResponse = await response.json()
+      const data = await response.json()
 
       if (response.status === 401) {
         setCreateMessage("Authentication failed. Please login again.")
@@ -263,9 +300,8 @@ export default function RolePage() {
         return
       }
 
-      if (response.ok && data.success) {
+      if (response.ok) {
         setCreateMessage("Role created successfully!")
-        addToast("success", "Role Created", `Role "${newRole.name}" has been successfully created.`)
         // Reset form
         setNewRole({
           name: "",
@@ -285,6 +321,93 @@ export default function RolePage() {
       setCreateMessage("Network error occurred while creating role")
     } finally {
       setIsCreatingRole(false)
+    }
+  }
+
+  // Handle view detail
+  const handleViewDetail = (role: RoleData) => {
+    setSelectedRole(role)
+    setIsDetailDialogOpen(true)
+    fetchRoleDetail(role.id)
+  }
+
+  // Handle add dialog open
+  const handleAddDialogOpen = (open: boolean) => {
+    setIsAddDialogOpen(open)
+    if (open) {
+      setCreateMessage("")
+    } else {
+      // Reset form when closing
+      setNewRole({
+        name: "",
+      })
+      setCreateMessage("")
+    }
+  }
+
+  // Initial load
+  useEffect(() => {
+    fetchRoles()
+  }, [])
+
+  // Handle search with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1)
+      fetchRoles(1, searchValue)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchValue])
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    fetchRoles(page, searchValue)
+  }
+
+  // Handle search value change
+  const handleSearchValueChange = (value: string) => {
+    setSearchValue(value)
+  }
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchValue("")
+    setCurrentPage(1)
+    fetchRoles(1, "")
+  }
+
+  // Statistics based on current data
+  const stats = [
+    {
+      title: "Total Roles",
+      value: totalItems.toString(),
+      description: "All system roles",
+      icon: Shield,
+      color: "text-purple-600",
+    },
+    {
+      title: "Active Roles",
+      value: roles.length.toString(),
+      description: "Currently active",
+      icon: UserCheck,
+      color: "text-green-600",
+    },
+    {
+      title: "Admin Roles",
+      value: roles.filter((role) => role.name.toLowerCase().includes("admin")).length.toString(),
+      description: "Administrative roles",
+      icon: Crown,
+      color: "text-blue-600",
+    },
+  ]
+
+  const handleAddRole = () => {
+    if (newRole.name) {
+      createRole()
+    } else {
+      setCreateMessage("Please fill in the role name")
     }
   }
 
@@ -350,6 +473,14 @@ export default function RolePage() {
     }
   }
 
+  const handleEditRole = () => {
+    if (selectedRole && selectedRole.name) {
+      updateRole(selectedRole.id)
+    } else {
+      setEditMessage("Please fill in the role name")
+    }
+  }
+
   // Delete role
   const deleteRole = async (roleId: number, roleName: string) => {
     try {
@@ -393,59 +524,6 @@ export default function RolePage() {
     }
   }
 
-  // Handle view detail
-  const handleViewDetail = (role: RoleData) => {
-    setSelectedRole(role)
-    setIsDetailDialogOpen(true)
-  }
-
-  // Handle add dialog open
-  const handleAddDialogOpen = (open: boolean) => {
-    setIsAddDialogOpen(open)
-    if (open) {
-      setCreateMessage("")
-    } else {
-      // Reset form when closing
-      setNewRole({
-        name: "",
-      })
-      setCreateMessage("")
-    }
-  }
-
-  // Initial load
-  useEffect(() => {
-    fetchRoles()
-  }, [])
-
-  // Handle search with debounce
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setCurrentPage(1)
-      fetchRoles(1, searchValue)
-    }, 500)
-
-    return () => clearTimeout(timeoutId)
-  }, [searchValue])
-
-  // Handle pagination
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    fetchRoles(page, searchValue)
-  }
-
-  // Handle search value change
-  const handleSearchValueChange = (value: string) => {
-    setSearchValue(value)
-  }
-
-  // Clear search
-  const handleClearSearch = () => {
-    setSearchValue("")
-    setCurrentPage(1)
-    fetchRoles(1, "")
-  }
-
   const handleDeleteRole = (role: RoleData) => {
     setRoleToDelete(role)
     setIsDeleteDialogOpen(true)
@@ -458,47 +536,6 @@ export default function RolePage() {
       setRoleToDelete(null)
     }
   }
-
-  const handleAddRole = () => {
-    if (newRole.name) {
-      createRole()
-    } else {
-      setCreateMessage("Please fill in the role name")
-    }
-  }
-
-  const handleEditRole = () => {
-    if (selectedRole && selectedRole.name) {
-      updateRole(selectedRole.id)
-    } else {
-      setEditMessage("Please fill in the role name")
-    }
-  }
-
-  // Statistics based on current data
-  const stats = [
-    {
-      title: "Total Roles",
-      value: totalItems.toString(),
-      description: "All system roles",
-      icon: Shield,
-      color: "text-purple-600",
-    },
-    {
-      title: "Active Roles",
-      value: roles.length.toString(),
-      description: "Currently active",
-      icon: UserCheck,
-      color: "text-green-600",
-    },
-    {
-      title: "Admin Roles",
-      value: roles.filter((role) => role.name.toLowerCase().includes("admin")).length.toString(),
-      description: "Administrative roles",
-      icon: Crown,
-      color: "text-blue-600",
-    },
-  ]
 
   const getRoleBadge = (roleName: string) => {
     const colors = {
@@ -675,8 +712,8 @@ export default function RolePage() {
 
       {/* API Error Message */}
       {apiError && (
-        <Alert className="border-red-200 bg-red-50">
-          <AlertDescription className="text-red-800">
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertDescription className="text-amber-800">
             <div className="flex items-center">
               <XCircle className="h-4 w-4 mr-2" />
               <span>Error loading roles: {apiError}</span>
@@ -855,7 +892,16 @@ export default function RolePage() {
           </DialogHeader>
 
           <div className="py-4">
-            {selectedRole ? (
+            {isLoadingDetail ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                <span className="ml-3 text-slate-600">Loading role details...</span>
+              </div>
+            ) : detailError ? (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">{detailError}</AlertDescription>
+              </Alert>
+            ) : roleDetail ? (
               <div className="space-y-6">
                 {/* Header Info */}
                 <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
@@ -863,8 +909,9 @@ export default function RolePage() {
                     <Shield className="w-8 h-8 text-slate-600" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-slate-900">{selectedRole.name}</h3>
-                    <div className="flex items-center space-x-2 mt-2">{getRoleBadge(selectedRole.name)}</div>
+                    <h3 className="text-xl font-semibold text-slate-900">{roleDetail.general.name}</h3>
+                    <p className="text-slate-600">{roleDetail.general.description || "No description"}</p>
+                    <div className="flex items-center space-x-2 mt-2">{getRoleBadge(roleDetail.general.name)}</div>
                   </div>
                 </div>
 
@@ -875,15 +922,15 @@ export default function RolePage() {
                       <Crown className="w-5 h-5 text-purple-600" />
                       <div>
                         <p className="text-sm font-medium text-slate-700">Role Name</p>
-                        <p className="text-slate-900">{selectedRole.name}</p>
+                        <p className="text-slate-900">{roleDetail.general.name}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
                       <Settings className="w-5 h-5 text-blue-600" />
                       <div>
-                        <p className="text-sm font-medium text-slate-700">Role ID</p>
-                        <p className="text-slate-900">#{selectedRole.id}</p>
+                        <p className="text-sm font-medium text-slate-700">Description</p>
+                        <p className="text-slate-900">{roleDetail.general.description || "No description"}</p>
                       </div>
                     </div>
                   </div>
@@ -893,7 +940,7 @@ export default function RolePage() {
                       <Calendar className="w-5 h-5 text-blue-600" />
                       <div>
                         <p className="text-sm font-medium text-slate-700">Created At</p>
-                        <p className="text-slate-900">{formatDateTime(selectedRole.created_at)}</p>
+                        <p className="text-slate-900">{formatDateTime(roleDetail.general.created_at)}</p>
                       </div>
                     </div>
 
@@ -901,7 +948,7 @@ export default function RolePage() {
                       <Calendar className="w-5 h-5 text-slate-600" />
                       <div>
                         <p className="text-sm font-medium text-slate-700">Updated At</p>
-                        <p className="text-slate-900">{formatDateTime(selectedRole.updated_at)}</p>
+                        <p className="text-slate-900">{formatDateTime(roleDetail.general.updated_at)}</p>
                       </div>
                     </div>
                   </div>
@@ -913,11 +960,11 @@ export default function RolePage() {
                   <div className="grid gap-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-purple-700">Role ID:</span>
-                      <span className="text-purple-900 font-medium">#{selectedRole.id}</span>
+                      <span className="text-purple-900 font-medium">#{roleDetail.general.id}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-purple-700">Role Type:</span>
-                      <span className="text-purple-900 font-medium">{selectedRole.name}</span>
+                      <span className="text-purple-900 font-medium">{roleDetail.general.name}</span>
                     </div>
                   </div>
                 </div>
@@ -1016,7 +1063,6 @@ export default function RolePage() {
                   </div>
                   <div>
                     <p className="font-medium text-red-900">{roleToDelete.name}</p>
-                    <p className="text-sm text-red-700">Role ID: #{roleToDelete.id}</p>
                   </div>
                 </div>
               </div>
