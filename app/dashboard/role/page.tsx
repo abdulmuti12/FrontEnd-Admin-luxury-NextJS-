@@ -63,8 +63,12 @@ interface PaginationLink {
 interface ApiResponse {
   success?: boolean
   message?: string
-  data: {
-    data: RoleData[]
+  data:
+    | {
+        data: RoleData[]
+      }
+    | RoleData[]
+  meta?: {
     current_page: number
     from: number
     last_page: number
@@ -74,22 +78,15 @@ interface ApiResponse {
     to: number
     total: number
   }
-  meta: {
-    current_page: number
-    from: number
-    last_page: number
-    links: PaginationLink[]
-    path: string
-    per_page: number
-    to: number
-    total: number
-  }
-  links: {
+  links?: {
     first: string
     last: string
     prev: string | null
     next: string | null
   }
+  current_page?: number
+  last_page?: number
+  total?: number
 }
 
 interface DetailApiResponse {
@@ -134,6 +131,7 @@ export default function RolePage() {
   const [newRole, setNewRole] = useState({
     name: "",
   })
+  const [apiError, setApiError] = useState("")
   const router = useRouter()
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -169,6 +167,7 @@ export default function RolePage() {
       }
 
       setIsSearching(true)
+      setApiError("")
 
       const params = new URLSearchParams()
       if (page > 1) params.append("page", page.toString())
@@ -178,6 +177,8 @@ export default function RolePage() {
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/role${params.toString() ? `?${params.toString()}` : ""}`
 
+      console.log("Fetching roles from:", url)
+
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -186,39 +187,72 @@ export default function RolePage() {
         },
       })
 
-      const data: ApiResponse = await response.json()
+      console.log("Response status:", response.status)
 
+      // Only redirect to login if we get a 401 Unauthorized
+      if (response.status === 401) {
+        console.log("Unauthorized access, redirecting to login")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const responseData = await response.json()
+      console.log("API Response:", responseData)
+
+      // Handle different response structures
       if (response.ok) {
-        // Handle successful response
-        if (data.data && data.data.data) {
-          setRoles(data.data.data)
-          setCurrentPage(data.meta.current_page)
-          setTotalPages(data.meta.last_page)
-          setTotalItems(data.meta.total)
-        } else {
-          // Handle case where data structure is different
-          setRoles([])
-          setCurrentPage(1)
-          setTotalPages(1)
-          setTotalItems(0)
+        let rolesList: RoleData[] = []
+        let currentPageNum = 1
+        let lastPageNum = 1
+        let totalItemsNum = 0
+
+        // Check if the response has data.data structure (nested data)
+        if (responseData.data && Array.isArray(responseData.data.data)) {
+          rolesList = responseData.data.data
+
+          // Get pagination info from meta or data
+          if (responseData.meta) {
+            currentPageNum = responseData.meta.current_page
+            lastPageNum = responseData.meta.last_page
+            totalItemsNum = responseData.meta.total
+          } else if (responseData.data.current_page) {
+            currentPageNum = responseData.data.current_page
+            lastPageNum = responseData.data.last_page || 1
+            totalItemsNum = responseData.data.total || rolesList.length
+          }
         }
+        // Check if the response has data array directly
+        else if (Array.isArray(responseData.data)) {
+          rolesList = responseData.data
+          totalItemsNum = rolesList.length
+        }
+        // Fallback for unexpected structure
+        else {
+          console.error("Unexpected API response structure:", responseData)
+          setApiError("Received unexpected data format from server")
+          rolesList = []
+        }
+
+        setRoles(rolesList)
+        setCurrentPage(currentPageNum)
+        setTotalPages(lastPageNum)
+        setTotalItems(totalItemsNum)
       } else {
-        // Handle error response
-        if (data.message) {
-          addToast("error", "Error", data.message)
+        // Handle error response but don't redirect unless it's 401
+        if (responseData.message) {
+          setApiError(responseData.message)
+          addToast("error", "Error", responseData.message)
+        } else {
+          setApiError(`Error: ${response.status} ${response.statusText}`)
         }
-        // If unauthorized, redirect to login
-        if (response.status === 401) {
-          localStorage.removeItem("token")
-          router.push("/login")
-        }
+        setRoles([])
       }
     } catch (error) {
       console.error("Role API error:", error)
+      setApiError("Network error occurred while fetching roles")
       addToast("error", "Network Error", "Failed to fetch roles. Please try again.")
-      // On network error, redirect to login
-      localStorage.removeItem("token")
-      router.push("/login")
+      setRoles([])
     } finally {
       setIsLoading(false)
       setIsSearching(false)
@@ -247,7 +281,14 @@ export default function RolePage() {
         },
       })
 
-      const data: DetailApiResponse = await response.json()
+      // Only redirect to login if we get a 401 Unauthorized
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
 
       if (response.ok && data.success) {
         setRoleDetail(data.data)
@@ -436,7 +477,6 @@ export default function RolePage() {
         },
         body: JSON.stringify({
           name: selectedRole.name,
-          description: selectedRole.description || "",
         }),
       })
 
@@ -707,6 +747,18 @@ export default function RolePage() {
           </Card>
         ))}
       </div>
+
+      {/* API Error Message */}
+      {apiError && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertDescription className="text-amber-800">
+            <div className="flex items-center">
+              <XCircle className="h-4 w-4 mr-2" />
+              <span>Error loading roles: {apiError}</span>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Search and Table */}
       <Card className="border-slate-200">
@@ -1005,17 +1057,6 @@ export default function RolePage() {
                   value={selectedRole.name}
                   onChange={(e) => setSelectedRole({ ...selectedRole, name: e.target.value })}
                   placeholder="Enter role name"
-                  disabled={isEditingRole}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-description">Description</Label>
-                <Input
-                  id="edit-description"
-                  value={selectedRole.description || ""}
-                  onChange={(e) => setSelectedRole({ ...selectedRole, description: e.target.value })}
-                  placeholder="Enter role description (optional)"
                   disabled={isEditingRole}
                 />
               </div>
