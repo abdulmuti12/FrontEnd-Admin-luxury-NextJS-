@@ -155,7 +155,9 @@ export default function RolePage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        router.push("/login")
+        setApiError("No authentication token found. Please login.")
+        setIsLoading(false)
+        setIsSearching(false)
         return
       }
 
@@ -171,6 +173,7 @@ export default function RolePage() {
       const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/role${params.toString() ? `?${params.toString()}` : ""}`
 
       console.log("Fetching roles from:", url)
+      console.log("Using token:", token ? "Token exists" : "No token")
 
       const response = await fetch(url, {
         method: "GET",
@@ -181,6 +184,7 @@ export default function RolePage() {
       })
 
       console.log("Response status:", response.status)
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
 
       // Only redirect to login if we get a 401 Unauthorized
       if (response.status === 401) {
@@ -190,30 +194,64 @@ export default function RolePage() {
         return
       }
 
-      const responseData: ApiResponse = await response.json()
-      console.log("API Response:", responseData)
+      let responseData: any
+      try {
+        responseData = await response.json()
+        console.log("API Response:", responseData)
+      } catch (parseError) {
+        console.error("Failed to parse JSON response:", parseError)
+        setApiError(`Failed to parse server response. Status: ${response.status}`)
+        setRoles([])
+        return
+      }
 
       if (response.ok) {
+        // Check if response has success field and it's false
+        if (responseData.success === false) {
+          setApiError(responseData.message || "API returned success: false")
+          addToast("error", "Error", responseData.message || "Failed to fetch roles")
+          setRoles([])
+          setCurrentPage(1)
+          setTotalPages(1)
+          setTotalItems(0)
+          return
+        }
+
         // Extract data from the correct structure
-        if (responseData.data && responseData.data.data) {
-          setRoles(responseData.data.data)
+        if (responseData.data && responseData.data.data && Array.isArray(responseData.data.data)) {
+          const rolesList = responseData.data.data
+          setRoles(rolesList)
           setCurrentPage(responseData.meta.current_page)
           setTotalPages(responseData.meta.last_page)
           setTotalItems(responseData.meta.total)
+          console.log("Roles loaded successfully:", rolesList.length, "roles")
+        } else if (responseData.data && Array.isArray(responseData.data)) {
+          // Fallback: if data is directly an array
+          setRoles(responseData.data)
+          setCurrentPage(1)
+          setTotalPages(1)
+          setTotalItems(responseData.data.length)
+          console.log("Roles loaded (fallback):", responseData.data.length, "roles")
         } else {
           console.error("Unexpected API response structure:", responseData)
-          setApiError("Received unexpected data format from server")
+          setApiError(
+            `Unexpected data format from server. Expected array of roles but got: ${typeof responseData.data}`,
+          )
           setRoles([])
         }
       } else {
         // Handle error response
-        setApiError(`Error: ${response.status} ${response.statusText}`)
+        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+        setApiError(errorMessage)
+        addToast("error", "API Error", errorMessage)
         setRoles([])
+        console.error("API Error:", errorMessage)
       }
     } catch (error) {
-      console.error("Role API error:", error)
-      setApiError("Network error occurred while fetching roles")
-      addToast("error", "Network Error", "Failed to fetch roles. Please try again.")
+      console.error("Network error:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown network error"
+      setApiError(`Network error: ${errorMessage}`)
+      addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
       setRoles([])
     } finally {
       setIsLoading(false)
@@ -347,7 +385,12 @@ export default function RolePage() {
 
   // Initial load
   useEffect(() => {
-    fetchRoles()
+    // Add a small delay to ensure the component is mounted
+    const timer = setTimeout(() => {
+      fetchRoles()
+    }, 100)
+
+    return () => clearTimeout(timer)
   }, [])
 
   // Handle search with debounce
@@ -712,11 +755,23 @@ export default function RolePage() {
 
       {/* API Error Message */}
       {apiError && (
-        <Alert className="border-amber-200 bg-amber-50">
-          <AlertDescription className="text-amber-800">
-            <div className="flex items-center">
-              <XCircle className="h-4 w-4 mr-2" />
-              <span>Error loading roles: {apiError}</span>
+        <Alert className="border-red-200 bg-red-50">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription className="text-red-800">
+            <div className="space-y-2">
+              <div className="font-medium">Error loading roles:</div>
+              <div className="text-sm">{apiError}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setApiError("")
+                  fetchRoles(currentPage, searchValue)
+                }}
+                className="mt-2"
+              >
+                Try Again
+              </Button>
             </div>
           </AlertDescription>
         </Alert>
