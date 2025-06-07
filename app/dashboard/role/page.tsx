@@ -1,5 +1,7 @@
 "use client"
 
+import { DialogTrigger } from "@/components/ui/dialog"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import {
@@ -103,6 +104,11 @@ interface ToastNotification {
   message: string
 }
 
+interface MenuItem {
+  id: number
+  name: string
+}
+
 export default function RolePage() {
   const [roles, setRoles] = useState<RoleData[]>([])
   const [searchValue, setSearchValue] = useState("")
@@ -132,6 +138,11 @@ export default function RolePage() {
 
   const [isEditingRole, setIsEditingRole] = useState(false)
   const [editMessage, setEditMessage] = useState("")
+
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [selectedMenus, setSelectedMenus] = useState<number[]>([])
+  const [isLoadingMenus, setIsLoadingMenus] = useState(false)
+  const [menuError, setMenuError] = useState("")
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -304,6 +315,48 @@ export default function RolePage() {
   }
 
   // Create new role
+  const fetchMenuItems = async () => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setMenuError("Authentication token not found. Please login again.")
+        return
+      }
+
+      setIsLoadingMenus(true)
+      setMenuError("")
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-menu`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        setMenuError("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setMenuItems(data.data)
+      } else {
+        setMenuError(data.message || "Failed to load menu items")
+      }
+    } catch (error) {
+      console.error("Menu items API error:", error)
+      setMenuError("Network error occurred while loading menu items")
+    } finally {
+      setIsLoadingMenus(false)
+    }
+  }
+
   const createRole = async () => {
     try {
       const token = localStorage.getItem("token")
@@ -326,6 +379,7 @@ export default function RolePage() {
         },
         body: JSON.stringify({
           name: newRole.name,
+          menus: selectedMenus, // Include selected menus
         }),
       })
 
@@ -338,14 +392,19 @@ export default function RolePage() {
         return
       }
 
-      if (response.ok) {
-        setCreateMessage("Role created successfully!")
+      if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Role Created", `Role "${newRole.name}" has been successfully created.`)
+
         // Reset form
         setNewRole({
           name: "",
         })
+        setSelectedMenus([])
+
         // Refresh role list
         fetchRoles(currentPage, searchValue)
+
         // Close dialog after a short delay
         setTimeout(() => {
           setIsAddDialogOpen(false)
@@ -373,12 +432,15 @@ export default function RolePage() {
   const handleAddDialogOpen = (open: boolean) => {
     setIsAddDialogOpen(open)
     if (open) {
+      fetchMenuItems() // Fetch menu items when opening add dialog
       setCreateMessage("")
+      setSelectedMenus([]) // Reset selected menus
     } else {
       // Reset form when closing
       setNewRole({
         name: "",
       })
+      setSelectedMenus([])
       setCreateMessage("")
     }
   }
@@ -446,12 +508,29 @@ export default function RolePage() {
     },
   ]
 
+  // Add a function to handle menu checkbox changes
+  const handleMenuCheckboxChange = (menuId: number) => {
+    setSelectedMenus((prev) => {
+      if (prev.includes(menuId)) {
+        return prev.filter((id) => id !== menuId)
+      } else {
+        return [...prev, menuId]
+      }
+    })
+  }
+
   const handleAddRole = () => {
-    if (newRole.name) {
-      createRole()
-    } else {
+    if (!newRole.name) {
       setCreateMessage("Please fill in the role name")
+      return
     }
+
+    if (selectedMenus.length === 0) {
+      setCreateMessage("Please select at least one menu")
+      return
+    }
+
+    createRole()
   }
 
   // Update role
@@ -699,7 +778,7 @@ export default function RolePage() {
               <DialogTitle>Add New Role</DialogTitle>
               <DialogDescription>Create a new system role</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
               {createMessage && (
                 <Alert
                   className={
@@ -723,6 +802,43 @@ export default function RolePage() {
                   placeholder="Enter role name"
                   disabled={isCreatingRole}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="menus">Menu Access *</Label>
+                {isLoadingMenus ? (
+                  <div className="flex items-center space-x-2 p-2 border rounded">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-400"></div>
+                    <span className="text-sm text-slate-600">Loading menu items...</span>
+                  </div>
+                ) : menuError ? (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-800">{menuError}</AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="border rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
+                    {menuItems.length > 0 ? (
+                      menuItems.map((menu) => (
+                        <div key={menu.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`menu-${menu.id}`}
+                            checked={selectedMenus.includes(menu.id)}
+                            onChange={() => handleMenuCheckboxChange(menu.id)}
+                            disabled={isCreatingRole}
+                            className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-500"
+                          />
+                          <label htmlFor={`menu-${menu.id}`} className="text-sm font-medium text-slate-700">
+                            {menu.name}
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No menu items available</p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-slate-500">Select which menus this role can access</p>
               </div>
             </div>
             <DialogFooter>
