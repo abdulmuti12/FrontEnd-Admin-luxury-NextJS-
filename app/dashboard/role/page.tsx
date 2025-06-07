@@ -48,10 +48,17 @@ interface RoleDetailData {
   general: {
     id: number
     name: string
-    description?: string
-    permissions?: string[]
     created_at: string
     updated_at: string
+    menu: {
+      menu: Array<{
+        id: number
+        name: string
+        route: string
+      }>
+    }
+    description?: string
+    permissions?: string[]
   }
 }
 
@@ -1125,6 +1132,37 @@ export default function RolePage() {
                   </div>
                 </div>
 
+                {/* Assigned Menus Section */}
+                {roleDetail.general.menu && roleDetail.general.menu.menu && roleDetail.general.menu.menu.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-slate-900">Assigned Menus</h4>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {roleDetail.general.menu.menu.map((menu) => (
+                        <div
+                          key={menu.id}
+                          className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg bg-blue-50"
+                        >
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Settings className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-blue-900">{menu.name}</p>
+                            <p className="text-xs text-blue-700">Route: /{menu.route}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No Menus Message */}
+                {roleDetail.general.menu &&
+                  (!roleDetail.general.menu.menu || roleDetail.general.menu.menu.length === 0) && (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-sm text-yellow-800">No menus assigned to this role.</p>
+                    </div>
+                  )}
+
                 {/* Additional Info */}
                 <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                   <h4 className="font-medium text-purple-900 mb-2">Role Information</h4>
@@ -1136,6 +1174,20 @@ export default function RolePage() {
                     <div className="flex justify-between">
                       <span className="text-purple-700">Role Type:</span>
                       <span className="text-purple-900 font-medium">{roleDetail.general.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-purple-700">Assigned Menus:</span>
+                      <span className="text-purple-900 font-medium">
+                        {roleDetail.general.menu && roleDetail.general.menu.menu
+                          ? roleDetail.general.menu.menu.length
+                          : 0}{" "}
+                        menu
+                        {roleDetail.general.menu &&
+                        roleDetail.general.menu.menu &&
+                        roleDetail.general.menu.menu.length !== 1
+                          ? "s"
+                          : ""}
+                      </span>
                     </div>
                   </div>
                 </div>
