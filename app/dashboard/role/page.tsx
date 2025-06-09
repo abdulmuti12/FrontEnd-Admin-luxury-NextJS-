@@ -151,6 +151,17 @@ export default function RolePage() {
   const [isLoadingMenus, setIsLoadingMenus] = useState(false)
   const [menuError, setMenuError] = useState("")
 
+  const [editRoleData, setEditRoleData] = useState<{
+    name: string
+    menus: Array<{
+      id: number
+      name: string
+      selected: boolean
+    }>
+  }>({ name: "", menus: [] })
+  const [selectedEditMenus, setSelectedEditMenus] = useState<number[]>([])
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false)
+
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
     const id = Math.random().toString(36).substr(2, 9)
@@ -541,6 +552,65 @@ export default function RolePage() {
   }
 
   // Update role
+  const fetchRoleForEdit = async (roleId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setEditMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      setIsLoadingEditData(true)
+      setEditMessage("")
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-edit-role/${roleId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        setEditMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setEditRoleData(data.data)
+
+        // Set selected menus based on the response
+        const initialSelectedMenus = data.data.menus.filter((menu) => menu.selected).map((menu) => menu.id)
+
+        setSelectedEditMenus(initialSelectedMenus)
+      } else {
+        setEditMessage(data.message || `Failed to load role data (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Fetch role for edit API error:", error)
+      setEditMessage("Network error occurred while loading role data")
+    } finally {
+      setIsLoadingEditData(false)
+    }
+  }
+
+  // Add this function to handle menu checkbox changes in edit mode:
+  const handleEditMenuCheckboxChange = (menuId: number) => {
+    setSelectedEditMenus((prev) => {
+      if (prev.includes(menuId)) {
+        return prev.filter((id) => id !== menuId)
+      } else {
+        return [...prev, menuId]
+      }
+    })
+  }
+
   const updateRole = async (roleId: number) => {
     try {
       const token = localStorage.getItem("token")
@@ -560,14 +630,16 @@ export default function RolePage() {
       }
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/role/${roleId}`, {
-        method: "PUT",
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
         body: JSON.stringify({
-          name: selectedRole.name,
+          name: editRoleData.name,
+          menus: selectedEditMenus,
+          _method: "PUT",
         }),
       })
 
@@ -582,7 +654,7 @@ export default function RolePage() {
 
       if (response.ok && data.success) {
         // Show success toast
-        addToast("success", "Role Updated", `Role "${selectedRole.name}" has been successfully updated.`)
+        addToast("success", "Role Updated", "Update Role Success")
         // Refresh role list
         fetchRoles(currentPage, searchValue)
         // Close dialog after a short delay
@@ -590,6 +662,8 @@ export default function RolePage() {
           setIsEditDialogOpen(false)
           setSelectedRole(null)
           setEditMessage("")
+          setEditRoleData({ name: "", menus: [] })
+          setSelectedEditMenus([])
         }, 1000)
       } else {
         setEditMessage(data.message || `Failed to update role (Status: ${response.status})`)
@@ -603,7 +677,7 @@ export default function RolePage() {
   }
 
   const handleEditRole = () => {
-    if (selectedRole && selectedRole.name) {
+    if (selectedRole && editRoleData.name) {
       updateRole(selectedRole.id)
     } else {
       setEditMessage("Please fill in the role name")
@@ -984,6 +1058,7 @@ export default function RolePage() {
                             setSelectedRole(role)
                             setIsEditDialogOpen(true)
                             setEditMessage("")
+                            fetchRoleForEdit(role.id) // Add this line to fetch role data for editing
                           }}
                         >
                           <Edit className="w-4 h-4" />
@@ -1060,7 +1135,7 @@ export default function RolePage() {
 
       {/* Detail Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Eye className="w-5 h-5 text-blue-600" />
@@ -1069,7 +1144,7 @@ export default function RolePage() {
             <DialogDescription>Detailed information about the selected role</DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
+          <div className="py-4 max-h-[70vh] overflow-y-auto">
             {isLoadingDetail ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
@@ -1135,23 +1210,31 @@ export default function RolePage() {
                 {/* Assigned Menus Section */}
                 {roleDetail.general.menu && roleDetail.general.menu.menu && roleDetail.general.menu.menu.length > 0 && (
                   <div className="space-y-4">
-                    <h4 className="font-medium text-slate-900">Assigned Menus</h4>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {roleDetail.general.menu.menu.map((menu) => (
-                        <div
-                          key={menu.id}
-                          className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg bg-blue-50"
-                        >
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Settings className="w-4 h-4 text-blue-600" />
+                    <h4 className="font-medium text-slate-900">
+                      Assigned Menus ({roleDetail.general.menu.menu.length})
+                    </h4>
+                    <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
+                      <div className="grid gap-2 md:grid-cols-1">
+                        {roleDetail.general.menu.menu.map((menu) => (
+                          <div
+                            key={menu.id}
+                            className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
+                          >
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Settings className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-blue-900 truncate">{menu.name}</p>
+                              <p className="text-xs text-blue-700 truncate">Route: /{menu.route}</p>
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-blue-900">{menu.name}</p>
-                            <p className="text-xs text-blue-700">Route: /{menu.route}</p>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
+                    <p className="text-xs text-slate-500">
+                      {roleDetail.general.menu.menu.length} menu{roleDetail.general.menu.menu.length !== 1 ? "s" : ""}{" "}
+                      assigned to this role
+                    </p>
                   </div>
                 )}
 
@@ -1211,40 +1294,75 @@ export default function RolePage() {
           if (!open) {
             setSelectedRole(null)
             setEditMessage("")
+            setEditRoleData({ name: "", menus: [] })
+            setSelectedEditMenus([])
           }
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Role</DialogTitle>
-            <DialogDescription>Update role information</DialogDescription>
+            <DialogDescription>Update role information and permissions</DialogDescription>
           </DialogHeader>
           {selectedRole && (
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
               {editMessage && (
                 <Alert
                   className={
-                    editMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                    editMessage.includes("success") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
                   }
                 >
-                  <AlertDescription
-                    className={editMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
-                  >
+                  <AlertDescription className={editMessage.includes("success") ? "text-green-800" : "text-red-800"}>
                     {editMessage}
                   </AlertDescription>
                 </Alert>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-name">Role Name *</Label>
-                <Input
-                  id="edit-name"
-                  value={selectedRole.name}
-                  onChange={(e) => setSelectedRole({ ...selectedRole, name: e.target.value })}
-                  placeholder="Enter role name"
-                  disabled={isEditingRole}
-                />
-              </div>
+              {isLoadingEditData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+                  <span className="ml-3 text-slate-600">Loading role data...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-name">Role Name *</Label>
+                    <Input
+                      id="edit-name"
+                      value={editRoleData.name}
+                      onChange={(e) => setEditRoleData({ ...editRoleData, name: e.target.value })}
+                      placeholder="Enter role name"
+                      disabled={isEditingRole}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-menus">Menu Access *</Label>
+                    <div className="border rounded-md p-3 space-y-2 max-h-60 overflow-y-auto">
+                      {editRoleData.menus && editRoleData.menus.length > 0 ? (
+                        editRoleData.menus.map((menu) => (
+                          <div key={menu.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`edit-menu-${menu.id}`}
+                              checked={selectedEditMenus.includes(menu.id)}
+                              onChange={() => handleEditMenuCheckboxChange(menu.id)}
+                              disabled={isEditingRole}
+                              className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-500"
+                            />
+                            <label htmlFor={`edit-menu-${menu.id}`} className="text-sm font-medium text-slate-700">
+                              {menu.name}
+                            </label>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-500">No menu items available</p>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500">Select which menus this role can access</p>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -1254,12 +1372,14 @@ export default function RolePage() {
                 setIsEditDialogOpen(false)
                 setSelectedRole(null)
                 setEditMessage("")
+                setEditRoleData({ name: "", menus: [] })
+                setSelectedEditMenus([])
               }}
-              disabled={isEditingRole}
+              disabled={isEditingRole || isLoadingEditData}
             >
               Cancel
             </Button>
-            <Button onClick={handleEditRole} disabled={isEditingRole}>
+            <Button onClick={handleEditRole} disabled={isEditingRole || isLoadingEditData}>
               {isEditingRole ? "Updating..." : "Update Role"}
             </Button>
           </DialogFooter>
