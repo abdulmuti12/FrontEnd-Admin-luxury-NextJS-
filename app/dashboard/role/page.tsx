@@ -989,7 +989,7 @@ export default function RolePage() {
               <div className="relative w-64">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search roles..."
+                  placeholder="Search roles by name..."
                   value={searchValue}
                   onChange={(e) => handleSearchValueChange(e.target.value)}
                   className="pl-10 pr-10"
@@ -1017,7 +1017,7 @@ export default function RolePage() {
           {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for "{searchValue}"
+              Searching for role name "{searchValue}"
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1078,7 +1078,7 @@ export default function RolePage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-slate-500">
-                    {searchValue ? `No roles found matching "${searchValue}".` : "No role data available."}
+                    {searchValue ? `No roles found with name matching "${searchValue}".` : "No role data available."}
                   </TableCell>
                 </TableRow>
               )}
