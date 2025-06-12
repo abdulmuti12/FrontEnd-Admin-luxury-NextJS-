@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,9 +13,10 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   Plus,
@@ -33,6 +36,8 @@ import {
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Image from "next/image"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 interface BrandData {
   id: number
@@ -111,6 +116,37 @@ export default function BrandPage() {
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [apiError, setApiError] = useState("")
   const router = useRouter()
+
+  // Add these state variables after the existing state declarations
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false)
+  const [createMessage, setCreateMessage] = useState("")
+  const [newBrand, setNewBrand] = useState({
+    name: "",
+    description: "",
+    note: "",
+  })
+  const [brandImage, setBrandImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [brandToDelete, setBrandToDelete] = useState<BrandData | null>(null)
+  const [isDeletingBrand, setIsDeletingBrand] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState("")
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [brandToEdit, setBrandToEdit] = useState<BrandData | null>(null)
+  const [isEditingBrand, setIsEditingBrand] = useState(false)
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false)
+  const [editMessage, setEditMessage] = useState("")
+  const [editBrand, setEditBrand] = useState({
+    name: "",
+    description: "",
+    note: "",
+  })
+  const [editBrandImage, setEditBrandImage] = useState<File | null>(null)
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
+  const [currentBrandImage, setCurrentBrandImage] = useState<string | null>(null)
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -330,6 +366,370 @@ export default function BrandPage() {
     return `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}/storage/${imagePath}`
   }
 
+  // Add this function to handle file input change
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setBrandImage(file)
+
+    // Create preview URL for the selected image
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    } else {
+      setImagePreview(null)
+    }
+  }
+
+  // Add this function to handle add dialog open/close
+  const handleAddDialogOpen = (open: boolean) => {
+    setIsAddDialogOpen(open)
+    if (!open) {
+      // Reset form when closing
+      setNewBrand({
+        name: "",
+        description: "",
+        note: "",
+      })
+      setBrandImage(null)
+      setImagePreview(null)
+      setCreateMessage("")
+    }
+  }
+
+  // Add this function to create a new brand
+  const createBrand = async () => {
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setCreateMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      setIsCreatingBrand(true)
+      setCreateMessage("")
+
+      // Create FormData object to handle file upload
+      const formData = new FormData()
+      formData.append("name", newBrand.name)
+      formData.append("description", newBrand.description)
+
+      if (newBrand.note) {
+        formData.append("note", newBrand.note)
+      }
+
+      if (brandImage) {
+        formData.append("image", brandImage)
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Don't set Content-Type header when using FormData
+          // It will be set automatically with the correct boundary
+        },
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        setCreateMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Brand Created", `Brand "${newBrand.name}" has been successfully created.`)
+
+        // Reset form
+        setNewBrand({
+          name: "",
+          description: "",
+          note: "",
+        })
+        setBrandImage(null)
+        setImagePreview(null)
+
+        // Refresh brand list
+        fetchBrands(currentPage, searchValue)
+
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setIsAddDialogOpen(false)
+          setCreateMessage("")
+        }, 2000)
+      } else {
+        setCreateMessage(data.message || `Failed to create brand (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Create brand API error:", error)
+      setCreateMessage("Network error occurred while creating brand")
+    } finally {
+      setIsCreatingBrand(false)
+    }
+  }
+
+  // Add this function to handle form submission
+  const handleAddBrand = () => {
+    if (!newBrand.name) {
+      setCreateMessage("Please enter a brand name")
+      return
+    }
+
+    createBrand()
+  }
+
+  // Handle delete brand
+  const handleDeleteBrand = (brand: BrandData) => {
+    setBrandToDelete(brand)
+    setIsDeleteDialogOpen(true)
+    setDeleteMessage("")
+  }
+
+  // Delete brand function
+  const deleteBrand = async () => {
+    if (!brandToDelete) return
+
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setDeleteMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      setIsDeletingBrand(true)
+      setDeleteMessage("")
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        setDeleteMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Brand Deleted", `Brand "${brandToDelete.name}" has been successfully deleted.`)
+
+        // Refresh brand list
+        fetchBrands(currentPage, searchValue)
+
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setIsDeleteDialogOpen(false)
+          setBrandToDelete(null)
+          setDeleteMessage("")
+        }, 1500)
+      } else {
+        setDeleteMessage(data.message || `Failed to delete brand (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Delete brand API error:", error)
+      setDeleteMessage("Network error occurred while deleting brand")
+    } finally {
+      setIsDeletingBrand(false)
+    }
+  }
+
+  // Handle delete dialog close
+  const handleDeleteDialogClose = () => {
+    if (!isDeletingBrand) {
+      setIsDeleteDialogOpen(false)
+      setBrandToDelete(null)
+      setDeleteMessage("")
+    }
+  }
+
+  // Handle edit brand
+  const handleEditBrand = async (brand: BrandData) => {
+    setBrandToEdit(brand)
+    setIsEditDialogOpen(true)
+    setEditMessage("")
+    setIsLoadingEditData(true)
+
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setEditMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand-edit/${brand.id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        setEditMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Populate form with existing data
+        setEditBrand({
+          name: data.data.name || "",
+          description: data.data.description || "",
+          note: data.data.note || "",
+        })
+        setCurrentBrandImage(data.data.image)
+        setEditImagePreview(null)
+        setEditBrandImage(null)
+      } else {
+        setEditMessage(data.message || `Failed to load brand data (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Load brand data API error:", error)
+      setEditMessage("Network error occurred while loading brand data")
+    } finally {
+      setIsLoadingEditData(false)
+    }
+  }
+
+  // Handle edit image change
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setEditBrandImage(file)
+
+    // Create preview URL for the selected image
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setEditImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    } else {
+      setEditImagePreview(null)
+    }
+  }
+
+  // Handle edit dialog close
+  const handleEditDialogClose = () => {
+    if (!isEditingBrand && !isLoadingEditData) {
+      setIsEditDialogOpen(false)
+      setBrandToEdit(null)
+      setEditMessage("")
+      setEditBrand({
+        name: "",
+        description: "",
+        note: "",
+      })
+      setEditBrandImage(null)
+      setEditImagePreview(null)
+      setCurrentBrandImage(null)
+    }
+  }
+
+  // Update brand function
+  const updateBrand = async () => {
+    if (!brandToEdit) return
+
+    try {
+      const token = localStorage.getItem("token")
+
+      if (!token) {
+        setEditMessage("Authentication token not found. Please login again.")
+        router.push("/login")
+        return
+      }
+
+      setIsEditingBrand(true)
+      setEditMessage("")
+
+      // Create FormData object to handle file upload
+      const formData = new FormData()
+      formData.append("name", editBrand.name)
+      formData.append("description", editBrand.description)
+      formData.append("_method", "PUT")
+
+      if (editBrand.note) {
+        formData.append("note", editBrand.note)
+      }
+
+      if (editBrandImage) {
+        formData.append("image", editBrandImage)
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToEdit.id}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          // Don't set Content-Type header when using FormData
+        },
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401) {
+        setEditMessage("Authentication failed. Please login again.")
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (response.ok && data.success) {
+        // Show success toast
+        addToast("success", "Brand Updated", `Brand "${editBrand.name}" has been successfully updated.`)
+
+        // Refresh brand list
+        fetchBrands(currentPage, searchValue)
+
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setIsEditDialogOpen(false)
+          setBrandToEdit(null)
+          setEditMessage("")
+        }, 2000)
+      } else {
+        setEditMessage(data.message || `Failed to update brand (Status: ${response.status})`)
+      }
+    } catch (error) {
+      console.error("Update brand API error:", error)
+      setEditMessage("Network error occurred while updating brand")
+    } finally {
+      setIsEditingBrand(false)
+    }
+  }
+
+  // Handle edit form submission
+  const handleUpdateBrand = () => {
+    if (!editBrand.name) {
+      setEditMessage("Please enter a brand name")
+      return
+    }
+
+    updateBrand()
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 space-y-6 p-6">
@@ -402,10 +802,119 @@ export default function BrandPage() {
           <h1 className="text-3xl font-bold text-slate-900">Brand Management</h1>
           <p className="text-slate-600 mt-2">Manage product brands and their information</p>
         </div>
-        <Button className="bg-slate-900 hover:bg-slate-800">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Brand
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={handleAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-slate-900 hover:bg-slate-800">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Brand
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add New Brand</DialogTitle>
+              <DialogDescription>Create a new product brand</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+              {createMessage && (
+                <Alert
+                  className={
+                    createMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                  }
+                >
+                  <AlertDescription
+                    className={createMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
+                  >
+                    {createMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="name">Brand Name *</Label>
+                <Input
+                  id="name"
+                  value={newBrand.name}
+                  onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
+                  placeholder="Enter brand name"
+                  disabled={isCreatingBrand}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="image">Brand Image</Label>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    disabled={isCreatingBrand}
+                    className="cursor-pointer"
+                  />
+                  {imagePreview && (
+                    <div className="mt-2 relative">
+                      <div className="w-full h-32 rounded-md overflow-hidden border border-slate-200">
+                        <Image
+                          src={imagePreview || "/placeholder.svg"}
+                          alt="Image preview"
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full bg-slate-800/60 hover:bg-slate-800/80 text-white"
+                        onClick={() => {
+                          setBrandImage(null)
+                          setImagePreview(null)
+                        }}
+                        disabled={isCreatingBrand}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove image</span>
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-500">Upload a brand logo or image (optional)</p>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  value={newBrand.description}
+                  onChange={(e) => setNewBrand({ ...newBrand, description: e.target.value })}
+                  placeholder="Enter brand description"
+                  disabled={isCreatingBrand}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="note">Note</Label>
+                <Textarea
+                  id="note"
+                  value={newBrand.note}
+                  onChange={(e) => setNewBrand({ ...newBrand, note: e.target.value })}
+                  placeholder="Enter additional notes (optional)"
+                  disabled={isCreatingBrand}
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => handleAddDialogOpen(false)} disabled={isCreatingBrand}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddBrand} disabled={isCreatingBrand}>
+                {isCreatingBrand ? "Creating..." : "Create Brand"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Statistics */}
@@ -561,10 +1070,20 @@ export default function BrandPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-800">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-slate-600 hover:text-slate-800"
+                          onClick={() => handleEditBrand(brand)}
+                        >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-800"
+                          onClick={() => handleDeleteBrand(brand)}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -780,6 +1299,213 @@ export default function BrandPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              <span>Delete Brand</span>
+            </DialogTitle>
+            <DialogDescription>This action cannot be undone. This will permanently delete the brand.</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {deleteMessage && (
+              <Alert
+                className={
+                  deleteMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                }
+              >
+                <AlertDescription
+                  className={deleteMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
+                >
+                  {deleteMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {brandToDelete && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg bg-slate-50">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center">
+                    {brandToDelete.image ? (
+                      <Image
+                        src={getBrandImage(brandToDelete.image) || "/placeholder.svg"}
+                        alt={brandToDelete.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=48&width=48"
+                        }}
+                      />
+                    ) : (
+                      <Award className="w-6 h-6 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-900">{brandToDelete.name}</p>
+                    <p className="text-sm text-slate-600">{brandToDelete.description}</p>
+                    <p className="text-xs text-slate-500">ID: {brandToDelete.id}</p>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="flex items-start space-x-2">
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-red-800">
+                      <p className="font-medium">Are you sure you want to delete this brand?</p>
+                      <p className="mt-1">Brand "{brandToDelete.name}" will be permanently removed from the system.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleDeleteDialogClose} disabled={isDeletingBrand}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteBrand}
+              disabled={isDeletingBrand}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingBrand ? "Deleting..." : "Delete Brand"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Brand</DialogTitle>
+            <DialogDescription>Update brand information</DialogDescription>
+          </DialogHeader>
+
+          {isLoadingEditData ? (
+            <div className="py-8 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400"></div>
+              <span className="ml-2 text-slate-600">Loading brand data...</span>
+            </div>
+          ) : (
+            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+              {editMessage && (
+                <Alert
+                  className={
+                    editMessage.includes("successfully") ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"
+                  }
+                >
+                  <AlertDescription
+                    className={editMessage.includes("successfully") ? "text-green-800" : "text-red-800"}
+                  >
+                    {editMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Brand Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editBrand.name}
+                  onChange={(e) => setEditBrand({ ...editBrand, name: e.target.value })}
+                  placeholder="Enter brand name"
+                  disabled={isEditingBrand}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-image">Brand Image</Label>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    id="edit-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditImageChange}
+                    disabled={isEditingBrand}
+                    className="cursor-pointer"
+                  />
+
+                  {/* Current Image Preview */}
+                  {(editImagePreview || currentBrandImage) && (
+                    <div className="mt-2 relative">
+                      <div className="w-full h-32 rounded-md overflow-hidden border border-slate-200">
+                        <Image
+                          src={editImagePreview || getBrandImage(currentBrandImage) || "/placeholder.svg"}
+                          alt="Brand image"
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                      {editImagePreview && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full bg-slate-800/60 hover:bg-slate-800/80 text-white"
+                          onClick={() => {
+                            setEditBrandImage(null)
+                            setEditImagePreview(null)
+                          }}
+                          disabled={isEditingBrand}
+                        >
+                          <X className="h-3 w-3" />
+                          <span className="sr-only">Remove new image</span>
+                        </Button>
+                      )}
+                      <p className="text-xs text-slate-500 mt-1">
+                        {editImagePreview ? "New image selected" : "Current brand image"}
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-500">Upload a new brand logo or image (optional)</p>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Description *</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editBrand.description}
+                  onChange={(e) => setEditBrand({ ...editBrand, description: e.target.value })}
+                  placeholder="Enter brand description"
+                  disabled={isEditingBrand}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-note">Note</Label>
+                <Textarea
+                  id="edit-note"
+                  value={editBrand.note}
+                  onChange={(e) => setEditBrand({ ...editBrand, note: e.target.value })}
+                  placeholder="Enter additional notes (optional)"
+                  disabled={isEditingBrand}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleEditDialogClose} disabled={isEditingBrand || isLoadingEditData}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateBrand} disabled={isEditingBrand || isLoadingEditData}>
+              {isEditingBrand ? "Updating..." : "Update Brand"}
             </Button>
           </DialogFooter>
         </DialogContent>
