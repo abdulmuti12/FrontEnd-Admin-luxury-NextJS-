@@ -24,6 +24,10 @@ export function DashboardHeader() {
     router.push("/login")
   }
 
+  const handleAccountInfo = () => {
+    router.push("/dashboard/account")
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/80 backdrop-blur-sm">
       <div className="flex h-16 items-center justify-between px-6">
@@ -55,7 +59,7 @@ export function DashboardHeader() {
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={handleAccountInfo}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Account Information</span>
               </DropdownMenuItem>

@@ -21,6 +21,11 @@ const menuItems = [
     icon: Home,
   },
   {
+    title: "Customers",
+    url: "/dashboard/customers",
+    icon: Users,
+  },
+  {
     title: "Admin",
     url: "/dashboard/admin",
     icon: Users,
