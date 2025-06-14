@@ -38,8 +38,8 @@ export default function AccountPage() {
           router.push("/login")
           return
         }
-
-        const response = await fetch("http://127.0.0.1:8000/api/admins/me", {
+        // http://127.0.0.1:8000/api/admins/me
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/me`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
