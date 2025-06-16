@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Eye, Edit, Trash2, Plus, Search, X, Tag, TrendingUp, Calendar } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 
 interface Category {
   id: number
@@ -58,7 +57,6 @@ export default function CategoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
 
   const router = useRouter()
-  const { toast } = useToast()
 
   const fetchCategories = async (page = 1, search = "") => {
     try {
