@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react"
+import { Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, X } from "lucide-react"
 
 interface CustomerData {
   id: number
@@ -59,7 +59,10 @@ export default function CustomersPage() {
   const [totalItems, setTotalItems] = useState(0)
   const router = useRouter()
 
-  const fetchCustomers = async (page = 1) => {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchType, setSearchType] = useState("all") // all, name, email, phone
+
+  const fetchCustomers = async (page = 1, search = "") => {
     try {
       setLoading(true)
       setError(null)
@@ -70,7 +73,14 @@ export default function CustomersPage() {
         return
       }
 
-      const url = `http://127.0.0.1:8000/api/admins/customer?page=${page}`
+      // Build URL with search parameters
+      let url = `http://127.0.0.1:8000/api/admins/customer?page=${page}`
+
+      if (search.trim()) {
+        // Add search parameter - the API will search across name, email, and phone
+        url += `&search=${encodeURIComponent(search.trim())}`
+      }
+
       console.log("Fetching customers from:", url)
 
       const response = await fetch(url, {
@@ -83,7 +93,6 @@ export default function CustomersPage() {
       })
 
       console.log("Response status:", response.status)
-      console.log("Response headers:", response.headers)
 
       if (response.status === 401) {
         localStorage.removeItem("token")
@@ -99,7 +108,6 @@ export default function CustomersPage() {
       }
 
       if (responseData.success) {
-        // Handle the nested data structure
         if (responseData.data && responseData.data.data && responseData.data.data.data) {
           setCustomers(responseData.data.data.data)
           setCurrentPage(responseData.data.meta.current_page)
@@ -120,13 +128,46 @@ export default function CustomersPage() {
     }
   }
 
+  // Debounced search function
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
+
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout)
+    }
+
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      setCurrentPage(1) // Reset to first page when searching
+      fetchCustomers(1, query)
+    }, 500) // 500ms delay
+
+    setSearchTimeout(timeout)
+  }
+
+  const handleClearSearch = () => {
+    setSearchQuery("")
+    setCurrentPage(1)
+    fetchCustomers(1, "")
+  }
+
   useEffect(() => {
     fetchCustomers(1)
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout)
+      }
+    }
   }, [])
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
-      fetchCustomers(page)
+      fetchCustomers(page, searchQuery)
     }
   }
 
@@ -142,7 +183,7 @@ export default function CustomersPage() {
   }
 
   const handleRetry = () => {
-    fetchCustomers(currentPage)
+    fetchCustomers(currentPage, searchQuery)
   }
 
   if (loading) {
@@ -187,20 +228,54 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Stats Card */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600">Total Customers</p>
-                <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
-              </div>
-              <Users className="w-8 h-8 text-blue-600" />
+      {/* Search Section */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center space-x-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search by name, email, or phone number..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            {searchQuery && (
+              <div className="text-sm text-slate-600">
+                Searching for: <span className="font-medium">"{searchQuery}"</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Card */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">{searchQuery ? "Search Results" : "Total Customers"}</p>
+              <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
+              {searchQuery && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Found {totalItems} customer{totalItems !== 1 ? "s" : ""} matching "{searchQuery}"
+                </p>
+              )}
+            </div>
+            <Users className="w-8 h-8 text-blue-600" />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Customers Table */}
       <Card>
