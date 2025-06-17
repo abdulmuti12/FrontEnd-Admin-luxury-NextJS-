@@ -1428,7 +1428,7 @@ export default function BrandPage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="edit-image">Brand Image</Label>
-                <div className="flex flex-col gap-2">
+                <div className="space-y-3">
                   <Input
                     id="edit-image"
                     type="file"
@@ -1438,41 +1438,76 @@ export default function BrandPage() {
                     className="cursor-pointer"
                   />
 
-                  {/* Current Image Preview */}
-                  {(editImagePreview || currentBrandImage) && (
-                    <div className="mt-2 relative">
-                      <div className="w-full h-32 rounded-md overflow-hidden border border-slate-200">
-                        <Image
-                          src={editImagePreview || getBrandImage(currentBrandImage) || "/placeholder.svg"}
-                          alt="Brand image"
-                          fill
-                          className="object-contain"
-                        />
-                      </div>
-                      {editImagePreview && (
+                  {/* Image Preview Section */}
+                  <div className="space-y-2">
+                    {editImagePreview ? (
+                      // New image selected
+                      <div className="relative">
+                        <div className="w-full h-40 rounded-lg overflow-hidden border-2 border-dashed border-blue-300 bg-blue-50">
+                          <Image
+                            src={editImagePreview || "/placeholder.svg"}
+                            alt="New brand image preview"
+                            fill
+                            className="object-contain p-2"
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full bg-slate-800/60 hover:bg-slate-800/80 text-white"
+                          className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md"
                           onClick={() => {
                             setEditBrandImage(null)
                             setEditImagePreview(null)
                           }}
                           disabled={isEditingBrand}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-4 w-4" />
                           <span className="sr-only">Remove new image</span>
                         </Button>
-                      )}
-                      <p className="text-xs text-slate-500 mt-1">
-                        {editImagePreview ? "New image selected" : "Current brand image"}
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-500">Upload a new brand logo or image (optional)</p>
+                        <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                          New Image
+                        </div>
+                      </div>
+                    ) : currentBrandImage ? (
+                      // Current existing image
+                      <div className="relative">
+                        <div className="w-full h-40 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                          <Image
+                            src={getBrandImage(currentBrandImage) || "/placeholder.svg"}
+                            alt="Current brand image"
+                            fill
+                            className="object-contain p-2"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.svg?height=160&width=320"
+                            }}
+                          />
+                        </div>
+                        <div className="absolute bottom-2 left-2 bg-slate-600 text-white text-xs px-2 py-1 rounded">
+                          Current Image
+                        </div>
+                      </div>
+                    ) : (
+                      // No image placeholder
+                      <div className="w-full h-40 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
+                        <div className="text-center">
+                          <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">No image uploaded</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-slate-500">
+                      {editImagePreview 
+                        ? "New image selected - will replace current image when saved" 
+                        : currentBrandImage 
+                        ? "Current brand image - upload a new file to replace" 
+                        : "Upload a brand logo or image (optional)"
+                      }
+                    </p>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="edit-description">Description *</Label>
@@ -1511,5 +1546,5 @@ export default function BrandPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  )\
 }
