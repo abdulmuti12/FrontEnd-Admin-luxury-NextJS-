@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, X } from "lucide-react"
+import { Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, X, Eye, Edit, Trash2 } from "lucide-react"
 
 interface CustomerData {
   id: number
@@ -60,7 +60,12 @@ export default function CustomersPage() {
   const router = useRouter()
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchType, setSearchType] = useState("all") // all, name, email, phone
+  const [searchType, setSearchType] = useState("all") // all, name, email, phone_number
+
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerData | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const fetchCustomers = async (page = 1, search = "") => {
     try {
@@ -77,8 +82,12 @@ export default function CustomersPage() {
       let url = `http://127.0.0.1:8000/api/admins/customer?page=${page}`
 
       if (search.trim()) {
-        // Add search parameter - the API will search across name, email, and phone
-        url += `&search=${encodeURIComponent(search.trim())}`
+        // Add search parameter based on search type
+        if (searchType === "all") {
+          url += `&search=${encodeURIComponent(search.trim())}`
+        } else {
+          url += `&${searchType}=${encodeURIComponent(search.trim())}`
+        }
       }
 
       console.log("Fetching customers from:", url)
@@ -152,6 +161,47 @@ export default function CustomersPage() {
     setSearchQuery("")
     setCurrentPage(1)
     fetchCustomers(1, "")
+  }
+
+  const handleDetail = (customer: CustomerData) => {
+    setSelectedCustomer(customer)
+    setShowDetailModal(true)
+  }
+
+  const handleEdit = (customer: CustomerData) => {
+    setSelectedCustomer(customer)
+    setShowEditModal(true)
+  }
+
+  const handleDelete = (customer: CustomerData) => {
+    setSelectedCustomer(customer)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!selectedCustomer) return
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://127.0.0.1:8000/api/admins/customer/${selectedCustomer.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
+
+      if (response.ok) {
+        setShowDeleteModal(false)
+        setSelectedCustomer(null)
+        fetchCustomers(currentPage, searchQuery) // Refresh the list
+      } else {
+        console.error("Failed to delete customer")
+      }
+    } catch (error) {
+      console.error("Error deleting customer:", error)
+    }
   }
 
   useEffect(() => {
@@ -228,32 +278,47 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Search Section */}
-
-      {/* Stats Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Total Customers</p>
-              <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
+      {/* Stats Card - Smaller and positioned on the left */}
+      <div className="flex justify-start">
+        <Card className="w-64">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-600">Total Customers</p>
+                <p className="text-xl font-bold text-slate-900">{totalItems}</p>
+              </div>
             </div>
-            <Users className="w-8 h-8 text-blue-600" />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Customers Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Customers List</CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-slate-700">Search by:</label>
+                <select
+                  value={searchType}
+                  onChange={(e) => setSearchType(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">All Fields</option>
+                  <option value="name">Name</option>
+                  <option value="email">Email</option>
+                  <option value="phone_number">Phone Number</option>
+                </select>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search by name, email, or phone..."
+                  placeholder={`Search by ${searchType === "all" ? "name, email, or phone" : searchType}...`}
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="w-64 pl-10 pr-10 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -267,10 +332,6 @@ export default function CustomersPage() {
                   </button>
                 )}
               </div>
-              <Button onClick={handleRetry} variant="outline" size="sm">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -292,6 +353,7 @@ export default function CustomersPage() {
                       <TableHead>Email</TableHead>
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -303,6 +365,34 @@ export default function CustomersPage() {
                         <TableCell>{customer.email}</TableCell>
                         <TableCell>{customer.phone_number}</TableCell>
                         <TableCell>{getStatusBadge(customer.status)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDetail(customer)}
+                              className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(customer)}
+                              className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(customer)}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -370,6 +460,125 @@ export default function CustomersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedCustomer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Customer Details</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-600">ID:</label>
+                <p className="text-sm">{selectedCustomer.id}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Name:</label>
+                <p className="text-sm">{selectedCustomer.name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Full Name:</label>
+                <p className="text-sm">{selectedCustomer.full_name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Email:</label>
+                <p className="text-sm">{selectedCustomer.email}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Phone Number:</label>
+                <p className="text-sm">{selectedCustomer.phone_number}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Status:</label>
+                <div className="mt-1">{getStatusBadge(selectedCustomer.status)}</div>
+              </div>
+            </div>
+            <div className="flex justify-end mt-6">
+              <Button onClick={() => setShowDetailModal(false)} variant="outline">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedCustomer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Edit Customer</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-600">Name:</label>
+                <input
+                  type="text"
+                  defaultValue={selectedCustomer.name}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Full Name:</label>
+                <input
+                  type="text"
+                  defaultValue={selectedCustomer.full_name}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Email:</label>
+                <input
+                  type="email"
+                  defaultValue={selectedCustomer.email}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Phone Number:</label>
+                <input
+                  type="text"
+                  defaultValue={selectedCustomer.phone_number}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Status:</label>
+                <select
+                  defaultValue={selectedCustomer.status}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <Button onClick={() => setShowEditModal(false)} variant="outline">
+                Cancel
+              </Button>
+              <Button onClick={() => setShowEditModal(false)}>Save Changes</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedCustomer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete customer "{selectedCustomer.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button onClick={() => setShowDeleteModal(false)} variant="outline">
+                Cancel
+              </Button>
+              <Button onClick={confirmDelete} variant="destructive">
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
