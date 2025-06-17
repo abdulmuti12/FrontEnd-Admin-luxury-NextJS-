@@ -229,48 +229,14 @@ export default function CustomersPage() {
       </div>
 
       {/* Search Section */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search by name, email, or phone number..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              {searchQuery && (
-                <button
-                  onClick={handleClearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {searchQuery && (
-              <div className="text-sm text-slate-600">
-                Searching for: <span className="font-medium">"{searchQuery}"</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Stats Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">{searchQuery ? "Search Results" : "Total Customers"}</p>
+              <p className="text-sm font-medium text-slate-600">Total Customers</p>
               <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
-              {searchQuery && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Found {totalItems} customer{totalItems !== 1 ? "s" : ""} matching "{searchQuery}"
-                </p>
-              )}
             </div>
             <Users className="w-8 h-8 text-blue-600" />
           </div>
@@ -280,13 +246,33 @@ export default function CustomersPage() {
       {/* Customers Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Customers List</span>
-            <Button onClick={handleRetry} variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Customers List</CardTitle>
+            <div className="flex items-center space-x-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or phone..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-64 pl-10 pr-10 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <Button onClick={handleRetry} variant="outline" size="sm">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {customers.length === 0 ? (
