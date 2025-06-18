@@ -29,6 +29,8 @@ interface Product {
   image3: string | null
   image4: string | null
   image5: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 interface Meta {
@@ -156,9 +158,44 @@ export default function ProductPage() {
   }
 
   // View product details
-  const viewProductDetails = (product: Product) => {
-    setSelectedProduct(product)
+  const viewProductDetails = async (product: Product) => {
+    setSelectedProduct(null)
     setDetailDialogOpen(true)
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/admins/product/${product.id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSelectedProduct(data.data.general)
+      } else {
+        setError(data.message)
+      }
+    } catch (err) {
+      setError("Failed to fetch product details. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -437,7 +474,12 @@ export default function ProductPage() {
             <DialogDescription>Detailed information about the selected product.</DialogDescription>
           </DialogHeader>
 
-          {selectedProduct && (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <p className="text-sm text-muted-foreground ml-2">Loading product details...</p>
+            </div>
+          ) : selectedProduct ? (
             <div className="space-y-4">
               {/* Product Images */}
               <div className="grid grid-cols-5 gap-2">
@@ -488,12 +530,28 @@ export default function ProductPage() {
                   <p className="text-sm font-medium text-muted-foreground">Category</p>
                   <p>{selectedProduct.category || "None"}</p>
                 </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                  <p>
+                    {selectedProduct.created_at ? new Date(selectedProduct.created_at).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Updated At</p>
+                  <p>
+                    {selectedProduct.updated_at ? new Date(selectedProduct.updated_at).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Description</p>
                 <p className="mt-1">{selectedProduct.description || "No description available"}</p>
               </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Failed to load product details</p>
             </div>
           )}
 
