@@ -80,6 +80,8 @@ export default function ProductPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
+  const [imageZoomOpen, setImageZoomOpen] = useState(false)
 
   // Fetch products
   const fetchProducts = async (page = 1, name = "", category = "", brand = "") => {
@@ -196,6 +198,11 @@ export default function ProductPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleImageClick = (index: number) => {
+    setSelectedImageIndex(index)
+    setImageZoomOpen(true)
   }
 
   return (
@@ -468,7 +475,7 @@ export default function ProductPage() {
 
       {/* Product Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Product Details</DialogTitle>
             <DialogDescription>Detailed information about the selected product.</DialogDescription>
@@ -495,14 +502,19 @@ export default function ProductPage() {
                     className="aspect-square rounded overflow-hidden bg-slate-100 flex items-center justify-center"
                   >
                     {image ? (
-                      <img
-                        src={image || "/placeholder.svg"}
-                        alt={`${selectedProduct.name} - Image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
-                        }}
-                      />
+                      <button
+                        onClick={() => handleImageClick(index)}
+                        className="w-full h-full focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                      >
+                        <img
+                          src={image || "/placeholder.svg"}
+                          alt={`${selectedProduct.name} - Image ${index + 1}`}
+                          className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-pointer"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                      </button>
                     ) : (
                       <ImageIcon className="h-6 w-6 text-slate-400" />
                     )}
@@ -514,10 +526,6 @@ export default function ProductPage() {
 
               {/* Product Info */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">ID</p>
-                  <p>{selectedProduct.id}</p>
-                </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Name</p>
                   <p>{selectedProduct.name}</p>
@@ -557,6 +565,40 @@ export default function ProductPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Zoom Dialog */}
+      <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Product Image</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && selectedImageIndex !== null && (
+            <div className="flex justify-center">
+              <img
+                src={
+                  [
+                    selectedProduct.image1,
+                    selectedProduct.image2,
+                    selectedProduct.image3,
+                    selectedProduct.image4,
+                    selectedProduct.image5,
+                  ][selectedImageIndex] || "/placeholder.svg"
+                }
+                alt={`${selectedProduct.name} - Image ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-[70vh] object-contain rounded"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=400&width=400"
+                }}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImageZoomOpen(false)}>
               Close
             </Button>
           </DialogFooter>
