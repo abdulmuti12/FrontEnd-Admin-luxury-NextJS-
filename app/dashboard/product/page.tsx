@@ -2,7 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Plus, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, X, Loader2, ImageIcon } from "lucide-react"
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Loader2,
+  ImageIcon,
+  User,
+  Building2,
+  Tag,
+  Calendar,
+  Clock,
+  FileText,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +46,8 @@ interface Product {
   image3: string | null
   image4: string | null
   image5: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 interface Meta {
@@ -78,6 +97,8 @@ export default function ProductPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
+  const [imageZoomOpen, setImageZoomOpen] = useState(false)
 
   // Fetch products
   const fetchProducts = async (page = 1, name = "", category = "", brand = "") => {
@@ -156,9 +177,49 @@ export default function ProductPage() {
   }
 
   // View product details
-  const viewProductDetails = (product: Product) => {
-    setSelectedProduct(product)
+  const viewProductDetails = async (product: Product) => {
+    setSelectedProduct(null)
     setDetailDialogOpen(true)
+    setLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/admins/product/${product.id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSelectedProduct(data.data.general)
+      } else {
+        setError(data.message)
+      }
+    } catch (err) {
+      setError("Failed to fetch product details. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleImageClick = (index: number) => {
+    setSelectedImageIndex(index)
+    setImageZoomOpen(true)
   }
 
   return (
@@ -202,82 +263,84 @@ export default function ProductPage() {
 
       {/* Search and Table */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="relative flex-1">
-            <Input
-              placeholder="Filter by category..."
-              value={searchCategory}
-              onChange={(e) => setSearchCategory(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchCategory && (
-              <button
-                onClick={() => setSearchCategory("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="relative flex-1">
-            <Input
-              placeholder="Filter by brand..."
-              value={searchBrand}
-              onChange={(e) => setSearchBrand(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchBrand && (
-              <button
-                onClick={() => setSearchBrand("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <Button onClick={handleSearch} disabled={isSearching}>
-            {isSearching ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Search
-              </>
-            )}
-          </Button>
-          {(searchTerm || searchCategory || searchBrand) && (
-            <Button variant="outline" onClick={clearSearch}>
-              Clear
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative flex-1">
+              <Input
+                placeholder="Filter by category..."
+                value={searchCategory}
+                onChange={(e) => setSearchCategory(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchCategory && (
+                <button
+                  onClick={() => setSearchCategory("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative flex-1">
+              <Input
+                placeholder="Filter by brand..."
+                value={searchBrand}
+                onChange={(e) => setSearchBrand(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchBrand && (
+                <button
+                  onClick={() => setSearchBrand("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Search
+                </>
+              )}
             </Button>
-          )}
+            {(searchTerm || searchCategory || searchBrand) && (
+              <Button variant="outline" onClick={clearSearch}>
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">{error}</div>
         ) : (
           <>
-            <div className="border rounded-lg overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -431,13 +494,18 @@ export default function ProductPage() {
 
       {/* Product Detail Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Product Details</DialogTitle>
             <DialogDescription>Detailed information about the selected product.</DialogDescription>
           </DialogHeader>
 
-          {selectedProduct && (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <p className="text-sm text-muted-foreground ml-2">Loading product details...</p>
+            </div>
+          ) : selectedProduct ? (
             <div className="space-y-4">
               {/* Product Images */}
               <div className="grid grid-cols-5 gap-2">
@@ -453,14 +521,19 @@ export default function ProductPage() {
                     className="aspect-square rounded overflow-hidden bg-slate-100 flex items-center justify-center"
                   >
                     {image ? (
-                      <img
-                        src={image || "/placeholder.svg"}
-                        alt={`${selectedProduct.name} - Image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
-                        }}
-                      />
+                      <button
+                        onClick={() => handleImageClick(index)}
+                        className="w-full h-full focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                      >
+                        <img
+                          src={image || "/placeholder.svg"}
+                          alt={`${selectedProduct.name} - Image ${index + 1}`}
+                          className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-pointer"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                      </button>
                     ) : (
                       <ImageIcon className="h-6 w-6 text-slate-400" />
                     )}
@@ -471,34 +544,125 @@ export default function ProductPage() {
               <Separator />
 
               {/* Product Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">ID</p>
-                  <p>{selectedProduct.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p>{selectedProduct.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Brand</p>
-                  <p>{selectedProduct.brand || "None"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Category</p>
-                  <p>{selectedProduct.category || "None"}</p>
-                </div>
-              </div>
+              <div className="space-y-4">
+                {/* Row 1: Name and Category */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Product Name</p>
+                      <p className="font-medium">{selectedProduct.name}</p>
+                    </div>
+                  </div>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Description</p>
-                <p className="mt-1">{selectedProduct.description || "No description available"}</p>
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-purple-100 rounded-full">
+                      <Tag className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Category</p>
+                      <p className="font-medium">{selectedProduct.category || "None"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Brand and Created At */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
+                      <Building2 className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Brand</p>
+                      <p className="font-medium">{selectedProduct.brand || "None"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-orange-100 rounded-full">
+                      <Calendar className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                      <p className="font-medium">
+                        {selectedProduct.created_at ? new Date(selectedProduct.created_at).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Updated At (single field) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-red-100 rounded-full">
+                      <Clock className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Updated At</p>
+                      <p className="font-medium">
+                        {selectedProduct.updated_at ? new Date(selectedProduct.updated_at).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  <div></div> {/* Empty space for alignment */}
+                </div>
+
+                {/* Row 4: Description (full width) */}
+                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-indigo-100 rounded-full mt-1">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Description</p>
+                    <p className="font-medium mt-1">{selectedProduct.description || "No description available"}</p>
+                  </div>
+                </div>
               </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Failed to load product details</p>
             </div>
           )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Zoom Dialog */}
+      <Dialog open={imageZoomOpen} onOpenChange={setImageZoomOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Product Image</DialogTitle>
+          </DialogHeader>
+          {selectedProduct && selectedImageIndex !== null && (
+            <div className="flex justify-center">
+              <img
+                src={
+                  [
+                    selectedProduct.image1,
+                    selectedProduct.image2,
+                    selectedProduct.image3,
+                    selectedProduct.image4,
+                    selectedProduct.image5,
+                  ][selectedImageIndex] || "/placeholder.svg"
+                }
+                alt={`${selectedProduct.name} - Image ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-[70vh] object-contain rounded"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=400&width=400"
+                }}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImageZoomOpen(false)}>
               Close
             </Button>
           </DialogFooter>
