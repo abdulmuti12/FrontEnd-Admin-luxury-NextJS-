@@ -263,82 +263,84 @@ export default function ProductPage() {
 
       {/* Search and Table */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="relative flex-1">
-            <Input
-              placeholder="Filter by category..."
-              value={searchCategory}
-              onChange={(e) => setSearchCategory(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchCategory && (
-              <button
-                onClick={() => setSearchCategory("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="relative flex-1">
-            <Input
-              placeholder="Filter by brand..."
-              value={searchBrand}
-              onChange={(e) => setSearchBrand(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            {searchBrand && (
-              <button
-                onClick={() => setSearchBrand("")}
-                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <Button onClick={handleSearch} disabled={isSearching}>
-            {isSearching ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search className="mr-2 h-4 w-4" />
-                Search
-              </>
-            )}
-          </Button>
-          {(searchTerm || searchCategory || searchBrand) && (
-            <Button variant="outline" onClick={clearSearch}>
-              Clear
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative flex-1">
+              <Input
+                placeholder="Filter by category..."
+                value={searchCategory}
+                onChange={(e) => setSearchCategory(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchCategory && (
+                <button
+                  onClick={() => setSearchCategory("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative flex-1">
+              <Input
+                placeholder="Filter by brand..."
+                value={searchBrand}
+                onChange={(e) => setSearchBrand(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              {searchBrand && (
+                <button
+                  onClick={() => setSearchBrand("")}
+                  className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Search
+                </>
+              )}
             </Button>
-          )}
+            {(searchTerm || searchCategory || searchBrand) && (
+              <Button variant="outline" onClick={clearSearch}>
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">{error}</div>
         ) : (
           <>
-            <div className="border rounded-lg overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
