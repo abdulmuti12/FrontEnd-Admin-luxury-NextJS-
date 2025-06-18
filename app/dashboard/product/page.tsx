@@ -2,7 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Plus, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, X, Loader2, ImageIcon } from "lucide-react"
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Loader2,
+  ImageIcon,
+  User,
+  Building2,
+  Tag,
+  Calendar,
+  Clock,
+  FileText,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -525,36 +542,70 @@ export default function ProductPage() {
               <Separator />
 
               {/* Product Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Name</p>
-                  <p>{selectedProduct.name}</p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                    <User className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Product Name</p>
+                    <p className="font-medium">{selectedProduct.name}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Brand</p>
-                  <p>{selectedProduct.brand || "None"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Category</p>
-                  <p>{selectedProduct.category || "None"}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                  <p>
-                    {selectedProduct.created_at ? new Date(selectedProduct.created_at).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Updated At</p>
-                  <p>
-                    {selectedProduct.updated_at ? new Date(selectedProduct.updated_at).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-              </div>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Description</p>
-                <p className="mt-1">{selectedProduct.description || "No description available"}</p>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
+                    <Building2 className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Brand</p>
+                    <p className="font-medium">{selectedProduct.brand || "None"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-purple-100 rounded-full">
+                    <Tag className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Category</p>
+                    <p className="font-medium">{selectedProduct.category || "None"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-orange-100 rounded-full">
+                    <Calendar className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Created At</p>
+                    <p className="font-medium">
+                      {selectedProduct.created_at ? new Date(selectedProduct.created_at).toLocaleDateString() : "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-red-100 rounded-full">
+                    <Clock className="h-4 w-4 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Updated At</p>
+                    <p className="font-medium">
+                      {selectedProduct.updated_at ? new Date(selectedProduct.updated_at).toLocaleDateString() : "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center justify-center w-8 h-8 bg-indigo-100 rounded-full mt-1">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Description</p>
+                    <p className="font-medium mt-1">{selectedProduct.description || "No description available"}</p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
