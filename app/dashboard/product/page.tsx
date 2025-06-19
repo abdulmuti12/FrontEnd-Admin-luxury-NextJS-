@@ -137,6 +137,10 @@ export default function ProductPage() {
     type: "success",
   })
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+
   // Fetch products
   const fetchProducts = async (page = 1, name = "", category = "", brand = "") => {
     setLoading(true)
@@ -368,6 +372,80 @@ export default function ProductPage() {
     } finally {
       setCreateLoading(false)
     }
+  }
+
+  // Delete product
+  const deleteProduct = async () => {
+    if (!productToDelete) return
+
+    setDeleteLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/admins/product/${productToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setDeleteDialogOpen(false)
+        setProductToDelete(null)
+        // Show success notification
+        setNotification({
+          show: true,
+          message: "Product deleted successfully!",
+          type: "success",
+        })
+        // Hide notification after 3 seconds
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+
+        // Refresh products list
+        fetchProducts(currentPage)
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to delete product",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to delete product. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product)
+    setDeleteDialogOpen(true)
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -633,6 +711,7 @@ export default function ProductPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => handleDeleteClick(product)}
                               className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -1033,6 +1112,69 @@ export default function ProductPage() {
                 </>
               ) : (
                 "Create Product"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Product</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this product? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          {productToDelete && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="w-10 h-10 rounded overflow-hidden bg-slate-100 flex-shrink-0">
+                  {productToDelete.image1 ? (
+                    <img
+                      src={productToDelete.image1 || "/placeholder.svg"}
+                      alt={productToDelete.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=40&width=40"
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="h-5 w-5 text-slate-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-red-900 truncate">{productToDelete.name}</p>
+                  <p className="text-sm text-red-700">ID: {productToDelete.id}</p>
+                  {productToDelete.brand && <p className="text-sm text-red-600">Brand: {productToDelete.brand}</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setProductToDelete(null)
+              }}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteProduct} disabled={deleteLoading}>
+              {deleteLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Product"
               )}
             </Button>
           </DialogFooter>
