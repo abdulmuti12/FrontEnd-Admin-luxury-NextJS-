@@ -46,6 +46,7 @@ interface Product {
   image3: string | null
   image4: string | null
   image5: string | null
+  image6: string | null
   created_at?: string
   updated_at?: string
 }
@@ -508,13 +509,14 @@ export default function ProductPage() {
           ) : selectedProduct ? (
             <div className="space-y-4">
               {/* Product Images */}
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-6 gap-2">
                 {[
                   selectedProduct.image1,
                   selectedProduct.image2,
                   selectedProduct.image3,
                   selectedProduct.image4,
                   selectedProduct.image5,
+                  selectedProduct.image6,
                 ].map((image, index) => (
                   <div
                     key={index}
@@ -651,6 +653,7 @@ export default function ProductPage() {
                     selectedProduct.image3,
                     selectedProduct.image4,
                     selectedProduct.image5,
+                    selectedProduct.image6,
                   ][selectedImageIndex] || "/placeholder.svg"
                 }
                 alt={`${selectedProduct.name} - Image ${selectedImageIndex + 1}`}
