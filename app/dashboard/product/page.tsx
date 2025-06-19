@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Product {
   id: number
@@ -100,6 +101,9 @@ export default function ProductPage() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [imageZoomOpen, setImageZoomOpen] = useState(false)
+
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
@@ -461,6 +465,65 @@ export default function ProductPage() {
       [imageKey]: file,
     }))
   }
+
+  // Fetch categories
+  const fetchCategories = async () => {
+    setCategoriesLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch("http://127.0.0.1:8000/api/admins/get-category", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setCategories(data.data)
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to fetch categories",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to fetch categories. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    } finally {
+      setCategoriesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (createDialogOpen) {
+      fetchCategories()
+    }
+  }, [createDialogOpen])
 
   return (
     <div className="p-6 space-y-6">
@@ -984,12 +1047,28 @@ export default function ProductPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Category ID *</label>
-                <Input
-                  value={formData.category_id}
-                  onChange={(e) => handleInputChange("category_id", e.target.value)}
-                  placeholder="Enter category ID"
-                />
+                <label className="text-sm font-medium">Category *</label>
+                <Select value={formData.category_id} onValueChange={(value) => handleInputChange("category_id", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select a category"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoriesLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading...</span>
+                      </div>
+                    ) : categories.length > 0 ? (
+                      categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id.toString()}>
+                          {category.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-3 text-sm text-muted-foreground">No categories available</div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-sm font-medium">Stock Type *</label>
