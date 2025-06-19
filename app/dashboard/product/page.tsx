@@ -157,7 +157,8 @@ export default function ProductPage() {
         return
       }
 
-      let url = `http://127.0.0.1:8000/api/admins/product?page=${page}`
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/admins/product?page=${page}`
+
       if (name) url += `&name=${encodeURIComponent(name)}`
       if (category) url += `&category=${encodeURIComponent(category)}`
       if (brand) url += `&brand=${encodeURIComponent(brand)}`
@@ -234,7 +235,8 @@ export default function ProductPage() {
         return
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/product/${product.id}`, {
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${product.id}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -306,7 +308,7 @@ export default function ProductPage() {
         formDataToSend.append("image6", imageFiles.image6)
       }
 
-      const response = await fetch("http://127.0.0.1:8000/api/admins/product", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -391,7 +393,7 @@ export default function ProductPage() {
         return
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/product/${productToDelete.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${productToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -477,7 +479,7 @@ export default function ProductPage() {
         return
       }
 
-      const response = await fetch("http://127.0.0.1:8000/api/admins/get-category", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-category`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,

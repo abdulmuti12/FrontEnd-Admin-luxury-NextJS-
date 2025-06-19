@@ -79,7 +79,7 @@ export default function CustomersPage() {
       }
 
       // Build URL with search parameters
-      let url = `http://127.0.0.1:8000/api/admins/customer?page=${page}`
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/admins/customer?page=${page}`
 
       if (search.trim()) {
         // Add search parameter based on search type
@@ -178,19 +178,22 @@ export default function CustomersPage() {
     setShowDeleteModal(true)
   }
 
-  const confirmDelete = async () => {
+ const confirmDelete = async () => {
     if (!selectedCustomer) return
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/customer/${selectedCustomer.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      })
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/admins/customer/${selectedCustomer.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
+      )
 
       if (response.ok) {
         setShowDeleteModal(false)
