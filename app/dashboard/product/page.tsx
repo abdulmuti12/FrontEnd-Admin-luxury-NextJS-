@@ -713,6 +713,127 @@ export default function ProductPage() {
     }))
   }
 
+  // Update product
+  const updateProduct = async () => {
+    setEditLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const formDataToSend = new FormData()
+      formDataToSend.append("_method", "PUT")
+      formDataToSend.append("name", editFormData.name)
+      formDataToSend.append("brand_id", editFormData.brand_id)
+      formDataToSend.append("category_id", editFormData.category_id)
+      formDataToSend.append("description", editFormData.description)
+      formDataToSend.append("stock_type", editFormData.stock_type)
+      formDataToSend.append("color", editFormData.color)
+
+      // Add images if new files are selected
+      if (editImageFiles.image1) {
+        formDataToSend.append("image1", editImageFiles.image1)
+      }
+      if (editImageFiles.image2) {
+        formDataToSend.append("image2", editImageFiles.image2)
+      }
+      if (editImageFiles.image3) {
+        formDataToSend.append("image3", editImageFiles.image3)
+      }
+      if (editImageFiles.image4) {
+        formDataToSend.append("image4", editImageFiles.image4)
+      }
+      if (editImageFiles.image5) {
+        formDataToSend.append("image5", editImageFiles.image5)
+      }
+      if (editImageFiles.image6) {
+        formDataToSend.append("image6", editImageFiles.image6)
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${editFormData.id}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formDataToSend,
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setEditDialogOpen(false)
+        // Show success notification
+        setNotification({
+          show: true,
+          message: "Product updated successfully!",
+          type: "success",
+        })
+        // Hide notification after 3 seconds
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+
+        // Reset form
+        setEditFormData({
+          id: 0,
+          name: "",
+          brand_id: "",
+          category_id: "",
+          description: "",
+          stock_type: "",
+          color: "",
+        })
+        setEditImageFiles({
+          image1: null,
+          image2: null,
+          image3: null,
+          image4: null,
+          image5: null,
+          image6: null,
+        })
+        setExistingImages({
+          image1: null,
+          image2: null,
+          image3: null,
+          image4: null,
+          image5: null,
+          image6: null,
+        })
+        // Refresh products list
+        fetchProducts(currentPage)
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to update product",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to update product. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -1687,11 +1808,11 @@ export default function ProductPage() {
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button disabled={editLoading}>
+            <Button onClick={updateProduct} disabled={editLoading}>
               {editLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
+                  Updating...
                 </>
               ) : (
                 "Update Product"
