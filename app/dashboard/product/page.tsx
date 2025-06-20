@@ -884,9 +884,10 @@ export default function ProductPage() {
         // Refresh products list
         fetchProducts(currentPage)
       } else {
+        // Show error notification with server message
         setNotification({
           show: true,
-          message: data.message || "Failed to update product",
+          message: data.message || "Failed to update product. Please try again.",
           type: "error",
         })
         setTimeout(() => {
@@ -896,7 +897,7 @@ export default function ProductPage() {
     } catch (err) {
       setNotification({
         show: true,
-        message: "Failed to update product. Please try again.",
+        message: "Network error. Failed to update product. Please try again.",
         type: "error",
       })
       setTimeout(() => {
