@@ -147,6 +147,48 @@ export default function ProductPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    id: 0,
+    name: "",
+    brand_id: "",
+    category_id: "",
+    description: "",
+    stock_type: "",
+    color: "",
+  })
+  const [editImageFiles, setEditImageFiles] = useState<{
+    image1: File | null
+    image2: File | null
+    image3: File | null
+    image4: File | null
+    image5: File | null
+    image6: File | null
+  }>({
+    image1: null,
+    image2: null,
+    image3: null,
+    image4: null,
+    image5: null,
+    image6: null,
+  })
+  const [existingImages, setExistingImages] = useState<{
+    image1: string | null
+    image2: string | null
+    image3: string | null
+    image4: string | null
+    image5: string | null
+    image6: string | null
+  }>({
+    image1: null,
+    image2: null,
+    image3: null,
+    image4: null,
+    image5: null,
+    image6: null,
+  })
+
   // Fetch products
   const fetchProducts = async (page = 1, name = "", category = "", brand = "") => {
     setLoading(true)
@@ -581,6 +623,96 @@ export default function ProductPage() {
     }
   }, [createDialogOpen])
 
+  // Edit product functions
+  const handleEditClick = async (product: Product) => {
+    setEditDialogOpen(true)
+    setEditLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/edit-product/${product.id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        const productData = data.data
+        setEditFormData({
+          id: productData.id,
+          name: productData.name,
+          brand_id: productData.brand_id.toString(),
+          category_id: productData.category_id.toString(),
+          description: productData.description,
+          stock_type: productData.stock_type,
+          color: productData.color,
+        })
+        setExistingImages({
+          image1: productData.image1,
+          image2: productData.image2,
+          image3: productData.image3,
+          image4: productData.image4,
+          image5: productData.image5,
+          image6: productData.image6,
+        })
+        // Fetch categories and brands for edit modal
+        fetchCategories()
+        fetchBrands()
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to load product data",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setEditDialogOpen(false)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to load product data. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      setEditDialogOpen(false)
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleEditInputChange = (field: string, value: string) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handleEditImageChange = (imageKey: keyof typeof editImageFiles, file: File | null) => {
+    setEditImageFiles((prev) => ({
+      ...prev,
+      [imageKey]: file,
+    }))
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -822,6 +954,7 @@ export default function ProductPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => handleEditClick(product)}
                               className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
                             >
                               <Pencil className="h-4 w-4" />
@@ -1263,6 +1396,305 @@ export default function ProductPage() {
                 </>
               ) : (
                 "Create Product"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+            <DialogDescription>Update product information.</DialogDescription>
+          </DialogHeader>
+
+          {editLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <p className="text-sm text-muted-foreground ml-2">Loading product data...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Product Name *</label>
+                  <Input
+                    value={editFormData.name}
+                    onChange={(e) => handleEditInputChange("name", e.target.value)}
+                    placeholder="Enter product name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Brand *</label>
+                  <Select
+                    value={editFormData.brand_id}
+                    onValueChange={(value) => handleEditInputChange("brand_id", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={brandsLoading ? "Loading brands..." : "Select a brand"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brandsLoading ? (
+                        <div className="flex items-center justify-center py-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm">Loading...</span>
+                        </div>
+                      ) : brands.length > 0 ? (
+                        brands.map((brand) => (
+                          <SelectItem key={brand.id} value={brand.id.toString()}>
+                            {brand.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="py-2 px-3 text-sm text-muted-foreground">No brands available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Category *</label>
+                  <Select
+                    value={editFormData.category_id}
+                    onValueChange={(value) => handleEditInputChange("category_id", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select a category"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoriesLoading ? (
+                        <div className="flex items-center justify-center py-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm">Loading...</span>
+                        </div>
+                      ) : categories.length > 0 ? (
+                        categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="py-2 px-3 text-sm text-muted-foreground">No categories available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Stock Type *</label>
+                  <Input
+                    value={editFormData.stock_type}
+                    onChange={(e) => handleEditInputChange("stock_type", e.target.value)}
+                    placeholder="Enter stock type"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Color *</label>
+                  <Input
+                    value={editFormData.color}
+                    onChange={(e) => handleEditInputChange("color", e.target.value)}
+                    placeholder="Enter color"
+                  />
+                </div>
+                <div></div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Description *</label>
+                <textarea
+                  className="w-full p-2 border border-gray-300 rounded-md resize-none"
+                  rows={3}
+                  value={editFormData.description}
+                  onChange={(e) => handleEditInputChange("description", e.target.value)}
+                  placeholder="Enter product description"
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Product Images</h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Image 1</label>
+                    {existingImages.image1 && !editImageFiles.image1 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image1 || "/placeholder.svg"}
+                          alt="Current Image 1"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image1", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image1 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image1.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Image 2</label>
+                    {existingImages.image2 && !editImageFiles.image2 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image2 || "/placeholder.svg"}
+                          alt="Current Image 2"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image2", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image2 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image2.name}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Image 3</label>
+                    {existingImages.image3 && !editImageFiles.image3 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image3 || "/placeholder.svg"}
+                          alt="Current Image 3"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image3", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image3 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image3.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Image 4</label>
+                    {existingImages.image4 && !editImageFiles.image4 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image4 || "/placeholder.svg"}
+                          alt="Current Image 4"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image4", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image4 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image4.name}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Image 5</label>
+                    {existingImages.image5 && !editImageFiles.image5 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image5 || "/placeholder.svg"}
+                          alt="Current Image 5"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image5", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image5 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image5.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Image 6</label>
+                    {existingImages.image6 && !editImageFiles.image6 && (
+                      <div className="mb-2">
+                        <img
+                          src={existingImages.image6 || "/placeholder.svg"}
+                          alt="Current Image 6"
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            ;(e.target as HTMLImageElement).src = "/placeholder.svg?height=80&width=80"
+                          }}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Current image</p>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleEditImageChange("image6", e.target.files?.[0] || null)}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    />
+                    {editImageFiles.image6 && (
+                      <p className="text-xs text-gray-500 mt-1">{editImageFiles.image6.name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={editLoading}>
+              {editLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Update Product"
               )}
             </Button>
           </DialogFooter>
