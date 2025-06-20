@@ -104,6 +104,8 @@ export default function ProductPage() {
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [brands, setBrands] = useState<{ id: number; name: string }[]>([])
+  const [brandsLoading, setBrandsLoading] = useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
@@ -519,9 +521,63 @@ export default function ProductPage() {
     }
   }
 
+  // Fetch brands
+  const fetchBrands = async () => {
+    setBrandsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch("http://127.0.0.1:8000/api/admins/get-brand", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        setBrands(data.data)
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to fetch brands",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to fetch brands. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    } finally {
+      setBrandsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (createDialogOpen) {
       fetchCategories()
+      fetchBrands()
     }
   }, [createDialogOpen])
 
@@ -1036,12 +1092,28 @@ export default function ProductPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Brand ID *</label>
-                <Input
-                  value={formData.brand_id}
-                  onChange={(e) => handleInputChange("brand_id", e.target.value)}
-                  placeholder="Enter brand ID"
-                />
+                <label className="text-sm font-medium">Brand *</label>
+                <Select value={formData.brand_id} onValueChange={(value) => handleInputChange("brand_id", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={brandsLoading ? "Loading brands..." : "Select a brand"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brandsLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading...</span>
+                      </div>
+                    ) : brands.length > 0 ? (
+                      brands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id.toString()}>
+                          {brand.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-3 text-sm text-muted-foreground">No brands available</div>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
