@@ -715,6 +715,79 @@ export default function ProductPage() {
 
   // Update product
   const updateProduct = async () => {
+    // Validate required fields
+    if (!editFormData.name.trim()) {
+      setNotification({
+        show: true,
+        message: "Product name is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
+    if (!editFormData.brand_id) {
+      setNotification({
+        show: true,
+        message: "Brand is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
+    if (!editFormData.category_id) {
+      setNotification({
+        show: true,
+        message: "Category is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
+    if (!editFormData.description.trim()) {
+      setNotification({
+        show: true,
+        message: "Description is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
+    if (!editFormData.stock_type.trim()) {
+      setNotification({
+        show: true,
+        message: "Stock type is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
+    if (!editFormData.color.trim()) {
+      setNotification({
+        show: true,
+        message: "Color is required",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+      return
+    }
+
     setEditLoading(true)
 
     try {
