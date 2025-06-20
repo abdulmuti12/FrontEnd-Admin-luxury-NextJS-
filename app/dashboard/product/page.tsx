@@ -733,7 +733,7 @@ export default function ProductPage() {
       formDataToSend.append("stock_type", editFormData.stock_type)
       formDataToSend.append("color", editFormData.color)
 
-      // Add images if new files are selected
+      // Add all image fields - send new files if selected, otherwise send empty
       if (editImageFiles.image1) {
         formDataToSend.append("image1", editImageFiles.image1)
       }
