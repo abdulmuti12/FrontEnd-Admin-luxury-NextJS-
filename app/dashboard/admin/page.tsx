@@ -169,7 +169,6 @@ export default function AdminPage() {
     const newToast: ToastNotification = { id, type, title, message }
     setToasts((prev) => [...prev, newToast])
 
-    // Auto remove toast after 5 seconds
     setTimeout(() => {
       removeToast(id)
     }, 5000)
