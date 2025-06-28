@@ -6,7 +6,26 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, X, Eye, Edit, Trash2 } from "lucide-react"
+import {
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  RefreshCw,
+  Search,
+  X,
+  Eye,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Shield,
+  Briefcase,
+  Building,
+  Globe,
+} from "lucide-react"
 
 interface CustomerData {
   id: number
@@ -67,6 +86,10 @@ export default function CustomersPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailedCustomerData, setDetailedCustomerData] = useState<any>(null)
+
   const fetchCustomers = async (page = 1, search = "") => {
     try {
       setLoading(true)
@@ -79,7 +102,7 @@ export default function CustomersPage() {
       }
 
       // Build URL with search parameters
-      let url = `${process.env.NEXT_PUBLIC_API_URL}/admins/customer?page=${page}`
+      let url = `http://127.0.0.1:8000/api/admins/customer?page=${page}`
 
       if (search.trim()) {
         // Add search parameter based on search type
@@ -163,9 +186,49 @@ export default function CustomersPage() {
     fetchCustomers(1, "")
   }
 
-  const handleDetail = (customer: CustomerData) => {
+  const handleDetail = async (customer: CustomerData) => {
     setSelectedCustomer(customer)
     setShowDetailModal(true)
+    setDetailLoading(true)
+    setDetailError(null)
+    setDetailedCustomerData(null)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      const response = await fetch(`http://127.0.0.1:8000/api/customers/customer-data/${customer.id}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
+
+      const responseData = await response.json()
+      console.log("Customer detail response:", responseData)
+
+      if (response.status === 401) {
+        localStorage.removeItem("token")
+        router.push("/login")
+        return
+      }
+
+      if (responseData.success) {
+        setDetailedCustomerData(responseData.data)
+      } else {
+        setDetailError(responseData.message || "Failed to fetch customer details")
+      }
+    } catch (error) {
+      console.error("Error fetching customer details:", error)
+      setDetailError("An error occurred while fetching customer details")
+    } finally {
+      setDetailLoading(false)
+    }
   }
 
   const handleEdit = (customer: CustomerData) => {
@@ -178,22 +241,19 @@ export default function CustomersPage() {
     setShowDeleteModal(true)
   }
 
- const confirmDelete = async () => {
+  const confirmDelete = async () => {
     if (!selectedCustomer) return
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/admins/customer/${selectedCustomer.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        }
-      )
+      const response = await fetch(`http://127.0.0.1:8000/api/admins/customer/${selectedCustomer.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      })
 
       if (response.ok) {
         setShowDeleteModal(false)
@@ -467,36 +527,261 @@ export default function CustomersPage() {
       {/* Detail Modal */}
       {showDetailModal && selectedCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Customer Details</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-gray-600">ID:</label>
-                <p className="text-sm">{selectedCustomer.id}</p>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">Customer Details</h3>
+                  <p className="text-sm text-slate-600">Detailed information about the selected customer</p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Name:</label>
-                <p className="text-sm">{selectedCustomer.name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Full Name:</label>
-                <p className="text-sm">{selectedCustomer.full_name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Email:</label>
-                <p className="text-sm">{selectedCustomer.email}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Phone Number:</label>
-                <p className="text-sm">{selectedCustomer.phone_number}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Status:</label>
-                <div className="mt-1">{getStatusBadge(selectedCustomer.status)}</div>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowDetailModal(false)
+                  setDetailError(null)
+                  setDetailLoading(false)
+                  setDetailedCustomerData(null)
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </Button>
             </div>
-            <div className="flex justify-end mt-6">
-              <Button onClick={() => setShowDetailModal(false)} variant="outline">
+
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3 text-slate-600">Loading customer details...</span>
+              </div>
+            ) : detailError ? (
+              <div className="py-8">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center text-red-600 mb-2">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    <span className="font-medium">Error Loading Details</span>
+                  </div>
+                  <p className="text-sm text-red-600">{detailError}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
+                  <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center">
+                    <Users className="w-8 h-8 text-slate-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-slate-900">
+                      {detailedCustomerData.general?.full_name ||
+                        detailedCustomerData.full_name ||
+                        detailedCustomerData.name ||
+                        selectedCustomer.name}
+                    </h3>
+                    <p className="text-slate-600">
+                      {detailedCustomerData.general?.email || detailedCustomerData.email || selectedCustomer.email}
+                    </p>
+                    <div className="flex items-center space-x-2 mt-2">
+                      {getStatusBadge(
+                        detailedCustomerData.general?.status || detailedCustomerData.status || selectedCustomer.status,
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* General Information Section */}
+                {detailedCustomerData.general && (
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-semibold text-slate-900 flex items-center">
+                      <Users className="w-5 h-5 text-blue-600 mr-2" />
+                      General Information
+                    </h4>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {Object.entries(detailedCustomerData.general)
+                        .filter(([key]) => key.toLowerCase() !== "id") // Add this filter to remove ID field
+                        .map(([key, value]) => {
+                          // Get appropriate icon for each field
+                          const getFieldIcon = (fieldKey: string) => {
+                            const iconMap: { [key: string]: any } = {
+                              id: Users,
+                              name: Users,
+                              full_name: Users,
+                              email: Mail,
+                              phone_number: Phone,
+                              phone: Phone,
+                              address: MapPin,
+                              alamat: MapPin,
+                              city: MapPin,
+                              kota: MapPin,
+                              country: Globe,
+                              negara: Globe,
+                              created_at: Calendar,
+                              updated_at: Calendar,
+                              birth_date: Calendar,
+                              tanggal_lahir: Calendar,
+                              gender: Users,
+                              jenis_kelamin: Users,
+                              status: Shield,
+                              age: Users,
+                              umur: Users,
+                              postal_code: MapPin,
+                              kode_pos: MapPin,
+                              province: MapPin,
+                              provinsi: MapPin,
+                              occupation: Briefcase,
+                              pekerjaan: Briefcase,
+                              company: Building,
+                              perusahaan: Building,
+                            }
+                            return iconMap[fieldKey.toLowerCase()] || Users
+                          }
+
+                          const IconComponent = getFieldIcon(key)
+                          const displayValue =
+                            typeof value === "object" && value !== null
+                              ? JSON.stringify(value, null, 2)
+                              : String(value || "N/A")
+
+                          return (
+                            <div
+                              key={key}
+                              className="flex items-start space-x-3 p-3 border border-slate-200 rounded-lg"
+                            >
+                              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <IconComponent className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-700 capitalize">
+                                  {key.replace(/_/g, " ")}
+                                </p>
+                                <p className="text-sm text-slate-900 break-words mt-1">{displayValue}</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Data Sections */}
+                {Object.entries(detailedCustomerData)
+                  .filter(([key]) => key !== "general")
+                  .map(([sectionKey, sectionData]) => (
+                    <div key={sectionKey} className="space-y-4">
+                      <h4 className="text-lg font-semibold text-slate-900 flex items-center">
+                        <Users className="w-5 h-5 text-blue-600 mr-2" />
+                        {sectionKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </h4>
+                      {typeof sectionData === "object" && sectionData !== null ? (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {Object.entries(sectionData).map(([key, value]) => {
+                            const getFieldIcon = (fieldKey: string) => {
+                              const iconMap: { [key: string]: any } = {
+                                id: Users,
+                                name: Users,
+                                full_name: Users,
+                                email: Mail,
+                                phone_number: Phone,
+                                phone: Phone,
+                                address: MapPin,
+                                alamat: MapPin,
+                                city: MapPin,
+                                kota: MapPin,
+                                country: Globe,
+                                negara: Globe,
+                                created_at: Calendar,
+                                updated_at: Calendar,
+                                birth_date: Calendar,
+                                tanggal_lahir: Calendar,
+                                gender: Users,
+                                jenis_kelamin: Users,
+                                status: Shield,
+                                age: Users,
+                                umur: Users,
+                                postal_code: MapPin,
+                                kode_pos: MapPin,
+                                province: MapPin,
+                                provinsi: MapPin,
+                                occupation: Briefcase,
+                                pekerjaan: Briefcase,
+                                company: Building,
+                                perusahaan: Building,
+                              }
+                              return iconMap[fieldKey.toLowerCase()] || Users
+                            }
+                            const IconComponent = getFieldIcon(key)
+                            const displayValue =
+                              typeof value === "object" && value !== null
+                                ? JSON.stringify(value, null, 2)
+                                : String(value || "N/A")
+
+                            return (
+                              <div
+                                key={key}
+                                className="flex items-start space-x-3 p-3 border border-slate-200 rounded-lg"
+                              >
+                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <IconComponent className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-700 capitalize">
+                                    {key.replace(/_/g, " ")}
+                                  </p>
+                                  <p className="text-sm text-slate-900 break-words mt-1">{displayValue}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 border border-slate-200 rounded-lg">
+                          <p className="text-sm text-slate-900">{String(sectionData || "N/A")}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {/* Additional Info Section */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-medium text-blue-900 mb-2">Customer Summary</h4>
+                  <div className="grid gap-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Customer ID:</span>
+                      <span className="text-blue-900 font-medium">
+                        #{detailedCustomerData.general?.id || detailedCustomerData.id || selectedCustomer.id}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Account Status:</span>
+                      <span className="text-blue-900 font-medium">
+                        {detailedCustomerData.general?.status || detailedCustomerData.status || selectedCustomer.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Contact Email:</span>
+                      <span className="text-blue-900 font-medium">
+                        {detailedCustomerData.general?.email || detailedCustomerData.email || selectedCustomer.email}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end mt-6 pt-4 border-t border-slate-200">
+              <Button
+                onClick={() => {
+                  setShowDetailModal(false)
+                  setDetailError(null)
+                  setDetailLoading(false)
+                  setDetailedCustomerData(null)
+                }}
+                variant="outline"
+              >
                 Close
               </Button>
             </div>
