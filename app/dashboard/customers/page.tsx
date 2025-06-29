@@ -16,7 +16,6 @@ import {
   X,
   Eye,
   Edit,
-  Trash2,
   Mail,
   Phone,
   MapPin,
@@ -84,11 +83,13 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerData | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailedCustomerData, setDetailedCustomerData] = useState<any>(null)
+
+  const [editStatus, setEditStatus] = useState("")
+  const [editLoading, setEditLoading] = useState(false)
 
   const fetchCustomers = async (page = 1, search = "") => {
     try {
@@ -233,37 +234,44 @@ export default function CustomersPage() {
 
   const handleEdit = (customer: CustomerData) => {
     setSelectedCustomer(customer)
+    setEditStatus(customer.status)
     setShowEditModal(true)
   }
 
-  const handleDelete = (customer: CustomerData) => {
-    setSelectedCustomer(customer)
-    setShowDeleteModal(true)
-  }
-
-  const confirmDelete = async () => {
+  const handleSaveEdit = async () => {
     if (!selectedCustomer) return
 
     try {
+      setEditLoading(true)
       const token = localStorage.getItem("token")
+
       const response = await fetch(`http://127.0.0.1:8000/api/admins/customer/${selectedCustomer.id}`, {
-        method: "DELETE",
+        method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
+        body: JSON.stringify({
+          status: editStatus,
+        }),
       })
 
-      if (response.ok) {
-        setShowDeleteModal(false)
+      const responseData = await response.json()
+
+      if (response.ok && responseData.success) {
+        setShowEditModal(false)
         setSelectedCustomer(null)
         fetchCustomers(currentPage, searchQuery) // Refresh the list
       } else {
-        console.error("Failed to delete customer")
+        console.error("Failed to update customer:", responseData.message)
+        alert(responseData.message || "Failed to update customer")
       }
     } catch (error) {
-      console.error("Error deleting customer:", error)
+      console.error("Error updating customer:", error)
+      alert("An error occurred while updating customer")
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -445,14 +453,6 @@ export default function CustomersPage() {
                               className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(customer)}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -793,44 +793,54 @@ export default function CustomersPage() {
       {showEditModal && selectedCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Edit Customer</h3>
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Edit className="w-4 h-4 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold">Edit Customer Status</h3>
+            </div>
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-600">Name:</label>
                 <input
                   type="text"
-                  defaultValue={selectedCustomer.name}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedCustomer.name}
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Full Name:</label>
                 <input
                   type="text"
-                  defaultValue={selectedCustomer.full_name}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedCustomer.full_name}
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Email:</label>
                 <input
                   type="email"
-                  defaultValue={selectedCustomer.email}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedCustomer.email}
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Phone Number:</label>
                 <input
                   type="text"
-                  defaultValue={selectedCustomer.phone_number}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedCustomer.phone_number}
+                  readOnly
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Status:</label>
                 <select
-                  defaultValue={selectedCustomer.status}
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
                   className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="active">Active</option>
@@ -839,29 +849,11 @@ export default function CustomersPage() {
               </div>
             </div>
             <div className="flex justify-end space-x-2 mt-6">
-              <Button onClick={() => setShowEditModal(false)} variant="outline">
+              <Button onClick={() => setShowEditModal(false)} variant="outline" disabled={editLoading}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowEditModal(false)}>Save Changes</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && selectedCustomer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete customer "{selectedCustomer.name}"? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-2">
-              <Button onClick={() => setShowDeleteModal(false)} variant="outline">
-                Cancel
-              </Button>
-              <Button onClick={confirmDelete} variant="destructive">
-                Delete
+              <Button onClick={handleSaveEdit} disabled={editLoading}>
+                {editLoading ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </div>
