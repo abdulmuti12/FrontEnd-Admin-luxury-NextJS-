@@ -221,8 +221,6 @@ export default function CampaignPage() {
         return
       }
 
-    //   let url = `${process.env.NEXT_PUBLIC_API_URL}/admins/banner?page=${page}`
-
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner?page=${page}`, {
         method: "GET",
         headers: {
@@ -277,7 +275,7 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/banner/${campaign.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaign.id}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -370,7 +368,7 @@ export default function CampaignPage() {
         }
       })
 
-      const response = await fetch("http://127.0.0.1:8000/api/admins/banner", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -444,7 +442,7 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/banner/${campaignToDelete.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaignToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -576,7 +574,7 @@ export default function CampaignPage() {
         }
       })
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/banner/${campaignToEdit.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaignToEdit.id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
