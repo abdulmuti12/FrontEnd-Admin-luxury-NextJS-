@@ -3,56 +3,50 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export default function CategoryLoading() {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-6 p-6">
+      <div className="flex justify-between items-center">
         <div>
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-64" />
+          <Skeleton className="h-8 w-[300px] mb-2" />
+          <Skeleton className="h-4 w-[400px]" />
         </div>
-        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-[140px]" />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
+      <div className="grid gap-6 md:grid-cols-3">
+        {[...Array(3)].map((_, index) => (
+          <Card key={index} className="border-slate-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
               <Skeleton className="h-4 w-4" />
             </CardHeader>
             <CardContent>
               <Skeleton className="h-8 w-16 mb-2" />
-              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-24" />
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Search and Table */}
-      <Card>
+      <Card className="border-slate-200">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-32" />
+          <div className="flex justify-between items-center">
+            <div>
+              <Skeleton className="h-6 w-[200px] mb-2" />
+              <Skeleton className="h-4 w-[300px]" />
+            </div>
             <Skeleton className="h-10 w-64" />
           </div>
         </CardHeader>
         <CardContent>
-          {/* Table Header */}
-          <div className="border rounded-lg">
-            <div className="grid grid-cols-4 gap-4 p-4 border-b bg-gray-50">
-              <Skeleton className="h-4 w-8" />
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-4 w-16" />
-            </div>
-
-            {/* Table Rows */}
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="grid grid-cols-4 gap-4 p-4 border-b">
-                <Skeleton className="h-4 w-6" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-32" />
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4 p-4 border rounded">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-3 w-[100px]" />
+                </div>
+                <Skeleton className="h-4 w-[100px]" />
                 <div className="flex space-x-2">
                   <Skeleton className="h-8 w-8" />
                   <Skeleton className="h-8 w-8" />
@@ -60,16 +54,6 @@ export default function CategoryLoading() {
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
-            <Skeleton className="h-4 w-32" />
-            <div className="flex space-x-2">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-8 w-8" />
-              <Skeleton className="h-8 w-20" />
-            </div>
           </div>
         </CardContent>
       </Card>

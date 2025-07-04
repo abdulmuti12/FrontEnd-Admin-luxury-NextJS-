@@ -203,6 +203,17 @@ export default function CampaignPage() {
     }
   }, [mounted])
 
+  // Helper function to safely parse JSON response
+  const parseJsonResponse = async (response: Response) => {
+    const text = await response.text()
+    try {
+      return JSON.parse(text)
+    } catch (error) {
+      console.error("Failed to parse JSON response:", text)
+      throw new Error(`Server returned invalid response. Status: ${response.status}`)
+    }
+  }
+
   const fetchCampaigns = async (page = 1) => {
     if (!mounted) return
 
@@ -221,7 +232,12 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner?page=${page}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.")
+      }
+
+      const response = await fetch(`${apiUrl}/admins/banner?page=${page}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -235,18 +251,22 @@ export default function CampaignPage() {
         return
       }
 
-      const data: ApiResponse = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data: ApiResponse = await parseJsonResponse(response)
 
       if (data.success) {
         setCampaigns(data.data.data.data)
         setPaginationMeta(data.data.meta)
         setCurrentPage(data.data.meta.current_page)
       } else {
-        setError(data.message)
+        setError(data.message || "Failed to fetch campaigns")
       }
     } catch (error) {
       console.error("Error fetching campaigns:", error)
-      setError("Failed to fetch campaigns. Please try again.")
+      setError(error instanceof Error ? error.message : "Failed to fetch campaigns. Please try again.")
     } finally {
       setLoading(false)
       setPaginationLoading(false)
@@ -275,7 +295,12 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaign.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured")
+      }
+
+      const response = await fetch(`${apiUrl}/admins/banner/${campaign.id}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -289,16 +314,20 @@ export default function CampaignPage() {
         return
       }
 
-      const data: DetailApiResponse = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data: DetailApiResponse = await parseJsonResponse(response)
 
       if (data.success) {
         setDetailedCampaignData(data.data.general)
       } else {
-        setDetailError(data.message)
+        setDetailError(data.message || "Failed to fetch campaign details")
       }
     } catch (error) {
       console.error("Error fetching campaign details:", error)
-      setDetailError("Failed to fetch campaign details. Please try again.")
+      setDetailError(error instanceof Error ? error.message : "Failed to fetch campaign details. Please try again.")
     } finally {
       setDetailLoading(false)
     }
@@ -355,6 +384,11 @@ export default function CampaignPage() {
         return
       }
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.")
+      }
+
       const formDataToSend = new FormData()
       formDataToSend.append("name", formData.name)
       formDataToSend.append("description", formData.description)
@@ -368,7 +402,18 @@ export default function CampaignPage() {
         }
       })
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner`, {
+      console.log("Creating campaign with URL:", `${apiUrl}/admins/banner`)
+      console.log("Form data:", {
+        name: formData.name,
+        type: formData.type,
+        description: formData.description,
+        note: formData.note,
+        files: Object.entries(files)
+          .filter(([, file]) => file !== null)
+          .map(([key]) => key),
+      })
+
+      const response = await fetch(`${apiUrl}/admins/banner`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -376,13 +421,23 @@ export default function CampaignPage() {
         body: formDataToSend,
       })
 
+      console.log("Response status:", response.status)
+      console.log("Response headers:", Object.fromEntries(response.headers.entries()))
+
       if (response.status === 401) {
         localStorage.removeItem("token")
         router.push("/login")
         return
       }
 
-      const data = await response.json()
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Error response:", errorText)
+        throw new Error(`HTTP error! status: ${response.status}. ${errorText.substring(0, 200)}`)
+      }
+
+      const data = await parseJsonResponse(response)
+      console.log("Response data:", data)
 
       if (data.success) {
         setCreateSuccess(true)
@@ -395,11 +450,11 @@ export default function CampaignPage() {
           setCreateSuccess(false)
         }, 3000)
       } else {
-        setCreateError(data.message)
+        setCreateError(data.message || "Failed to create campaign")
       }
     } catch (error) {
       console.error("Error creating campaign:", error)
-      setCreateError("Failed to create campaign. Please try again.")
+      setCreateError(error instanceof Error ? error.message : "Failed to create campaign. Please try again.")
     } finally {
       setCreateLoading(false)
     }
@@ -442,7 +497,12 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaignToDelete.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured")
+      }
+
+      const response = await fetch(`${apiUrl}/admins/banner/${campaignToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -456,7 +516,11 @@ export default function CampaignPage() {
         return
       }
 
-      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setDeleteSuccess(true)
@@ -469,7 +533,7 @@ export default function CampaignPage() {
           setDeleteSuccess(false)
         }, 3000)
       } else {
-        setDeleteError(data.message)
+        setDeleteError(data.message || "Failed to delete campaign")
         // Hide error notification after 5 seconds
         setTimeout(() => {
           setDeleteError(null)
@@ -477,7 +541,7 @@ export default function CampaignPage() {
       }
     } catch (error) {
       console.error("Error deleting campaign:", error)
-      setDeleteError("Failed to delete campaign. Please try again.")
+      setDeleteError(error instanceof Error ? error.message : "Failed to delete campaign. Please try again.")
       // Hide error notification after 5 seconds
       setTimeout(() => {
         setDeleteError(null)
@@ -502,7 +566,12 @@ export default function CampaignPage() {
         return
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/banner-edit/${campaign.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured")
+      }
+
+      const response = await fetch(`${apiUrl}/admins/banner-edit/${campaign.id}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -516,7 +585,11 @@ export default function CampaignPage() {
         return
       }
 
-      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         const campaignData = data.data
@@ -536,11 +609,11 @@ export default function CampaignPage() {
           file7: campaignData.file7 || null,
         })
       } else {
-        setEditError(data.message)
+        setEditError(data.message || "Failed to fetch campaign data")
       }
     } catch (error) {
       console.error("Error fetching campaign for edit:", error)
-      setEditError("Failed to fetch campaign data. Please try again.")
+      setEditError(error instanceof Error ? error.message : "Failed to fetch campaign data. Please try again.")
     } finally {
       setEditLoading(false)
     }
@@ -560,6 +633,11 @@ export default function CampaignPage() {
         return
       }
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiUrl) {
+        throw new Error("API URL is not configured")
+      }
+
       const formDataToSend = new FormData()
       formDataToSend.append("_method", "PUT")
       formDataToSend.append("name", editFormData.name)
@@ -574,7 +652,7 @@ export default function CampaignPage() {
         }
       })
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/banner/${campaignToEdit.id}`, {
+      const response = await fetch(`${apiUrl}/admins/banner/${campaignToEdit.id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -588,7 +666,11 @@ export default function CampaignPage() {
         return
       }
 
-      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await parseJsonResponse(response)
 
       if (data.success) {
         setEditSuccess(true)
@@ -601,11 +683,11 @@ export default function CampaignPage() {
           setEditSuccess(false)
         }, 3000)
       } else {
-        setEditError(data.message)
+        setEditError(data.message || "Failed to update campaign")
       }
     } catch (error) {
       console.error("Error updating campaign:", error)
-      setEditError("Failed to update campaign. Please try again.")
+      setEditError(error instanceof Error ? error.message : "Failed to update campaign. Please try again.")
     } finally {
       setEditLoading(false)
     }
