@@ -1,6 +1,19 @@
 "use client"
 
-import { Users, UserCheck, Package, Tag, Home, Settings, Award, Megaphone } from "lucide-react"
+import {
+  Users,
+  UserCheck,
+  Package,
+  Tag,
+  Home,
+  Settings,
+  Award,
+  Megaphone,
+  FolderOpen,
+  FileText,
+  Newspaper,
+  Gift,
+} from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -55,6 +68,26 @@ const menuItems = [
     url: "/dashboard/campaign",
     icon: Megaphone,
   },
+  {
+    title: "Project",
+    url: "/dashboard/project",
+    icon: FolderOpen,
+  },
+  {
+    title: "Material",
+    url: "/dashboard/material",
+    icon: FileText,
+  },
+  {
+    title: "Press Release",
+    url: "/dashboard/press-release",
+    icon: Newspaper,
+  },
+  {
+    title: "Promotion",
+    url: "/dashboard/promotion",
+    icon: Gift,
+  },
 ]
 
 export function AppSidebar() {
@@ -98,7 +131,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-slate-200 p-4">
-        <div className="text-xs text-slate-500 text-center">© 2025 Markom Team</div>
+        <div className="text-xs text-slate-500 text-center">© 2025 Marcomm Team</div>
       </SidebarFooter>
     </Sidebar>
   )
