@@ -130,6 +130,7 @@ export default function MaterialPage() {
     file: null as File | null,
   })
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
+  const [originalEditImageUrl, setOriginalEditImageUrl] = useState<string | null>(null)
   const editFileInputRef = useRef<HTMLInputElement>(null)
 
   // Helper function to get full image URL
@@ -649,12 +650,20 @@ export default function MaterialPage() {
         setEditMaterial({
           name: data.data.name || "",
           description: data.data.description || "",
-          file: null,
+          file: null, // Always start with null for new file selection
         })
+
         // Set existing image preview if available
-        if (data.data.file) {
-          setEditImagePreview(getImageUrl(data.data.file))
-        }
+        const existingImageUrl = getImageUrl(data.data.file)
+        setOriginalEditImageUrl(existingImageUrl)
+        setEditImagePreview(existingImageUrl)
+
+        console.log("Edit data loaded:", {
+          name: data.data.name,
+          description: data.data.description,
+          file: data.data.file,
+          imageUrl: existingImageUrl,
+        })
       } else {
         setEditMessage(data.message || `Failed to load material data (Status: ${response.status})`)
       }
@@ -677,6 +686,7 @@ export default function MaterialPage() {
         file: null,
       })
       setEditImagePreview(null)
+      setOriginalEditImageUrl(null)
       if (editFileInputRef.current) {
         editFileInputRef.current.value = ""
       }
@@ -700,38 +710,58 @@ export default function MaterialPage() {
 
       // Create FormData for file upload
       const formData = new FormData()
-      formData.append("name", editMaterial.name)
-      formData.append("description", editMaterial.description)
-      formData.append("_method", "PUT") // Laravel method spoofing for file uploads
+      formData.append("name", editMaterial.name.trim())
+      formData.append("description", editMaterial.description.trim())
 
-      // Only append file if a new one is selected
+      // Add method spoofing for Laravel
+      formData.append("_method", "PUT")
+
+      // Always append file field, even if null
       if (editMaterial.file) {
         formData.append("file", editMaterial.file)
-        console.log(
-          "File being uploaded for edit:",
-          editMaterial.file.name,
-          editMaterial.file.type,
-          editMaterial.file.size,
-        )
+        console.log("New file being uploaded for edit:", {
+          name: editMaterial.file.name,
+          type: editMaterial.file.type,
+          size: editMaterial.file.size,
+        })
+      } else {
+        console.log("No new file selected for update")
       }
 
-      console.log("Edit FormData contents:")
+      // Debug FormData contents
+      console.log("Update FormData contents:")
       for (const [key, value] of formData.entries()) {
-        console.log(key, value)
+        if (value instanceof File) {
+          console.log(`${key}:`, {
+            name: value.name,
+            type: value.type,
+            size: value.size,
+          })
+        } else {
+          console.log(`${key}:`, value)
+        }
       }
 
       const response = await fetch(`http://127.0.0.1:8000/api/admins/made/${materialToEdit.id}`, {
-        method: "POST", // Use POST with _method for file uploads in Laravel
+        method: "POST", // Use POST with _method for Laravel file uploads
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData
+          // Don't set Content-Type for FormData - let browser set it with boundary
         },
         body: formData,
       })
 
       console.log("Update response status:", response.status)
-      const data = await response.json()
-      console.log("Update response data:", data)
+
+      let data: any
+      try {
+        data = await response.json()
+        console.log("Update response data:", data)
+      } catch (parseError) {
+        console.error("Failed to parse update response:", parseError)
+        setEditMessage("Failed to parse server response")
+        return
+      }
 
       if (response.status === 401) {
         setEditMessage("Authentication failed. Please login again.")
@@ -747,9 +777,18 @@ export default function MaterialPage() {
           setIsEditDialogOpen(false)
           setMaterialToEdit(null)
           setEditMessage("")
+          setEditMaterial({
+            name: "",
+            description: "",
+            file: null,
+          })
+          setEditImagePreview(null)
+          setOriginalEditImageUrl(null)
         }, 2000)
       } else {
-        setEditMessage(data.message || `Failed to update material (Status: ${response.status})`)
+        const errorMessage = data?.message || `Failed to update material (Status: ${response.status})`
+        setEditMessage(errorMessage)
+        console.error("Update failed:", errorMessage)
       }
     } catch (error) {
       console.error("Update material API error:", error)
@@ -760,7 +799,7 @@ export default function MaterialPage() {
   }
 
   const handleUpdateMaterial = () => {
-    if (!editMaterial.name) {
+    if (!editMaterial.name.trim()) {
       setEditMessage("Please enter a material name")
       return
     }
@@ -1514,13 +1553,22 @@ export default function MaterialPage() {
                     className="w-full"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {editMaterial.file || editImagePreview ? "Change Image" : "Upload New Image"}
+                    {editMaterial.file
+                      ? "Change Selected Image"
+                      : editImagePreview
+                        ? "Change Current Image"
+                        : "Upload New Image"}
                   </Button>
 
+                  {/* Show current image or new selected image */}
                   {(editImagePreview || editMaterial.file) && (
                     <div className="relative">
                       <img
-                        src={editImagePreview || (materialToEdit ? getImageUrl(materialToEdit.file) : "") || ""}
+                        src={
+                          editMaterial.file
+                            ? URL.createObjectURL(editMaterial.file)
+                            : editImagePreview || "/placeholder.svg"
+                        }
                         alt="Preview"
                         className="w-full h-32 object-cover rounded-lg border"
                         onError={(e) => {
@@ -1543,10 +1591,22 @@ export default function MaterialPage() {
                       >
                         <X className="w-4 h-4" />
                       </Button>
+                      {editMaterial.file && (
+                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                          New Image Selected
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <p className="text-xs text-slate-500">Supported formats: JPG, PNG, GIF. Max size: 5MB</p>
+                  <p className="text-xs text-slate-500">
+                    Supported formats: JPG, PNG, GIF. Max size: 5MB
+                    {originalEditImageUrl && !editMaterial.file && (
+                      <span className="block mt-1 text-blue-600">
+                        Current image will be kept if no new image is selected
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
