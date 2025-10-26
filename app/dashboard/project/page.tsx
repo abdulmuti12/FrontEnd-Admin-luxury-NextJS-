@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,8 +23,11 @@ import {
   Search,
   Edit,
   Trash2,
-  Award,
-  Package,
+  FolderOpen,
+  ImageIcon,
+  FileText,
+  Globe,
+  Smartphone,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -32,33 +35,36 @@ import {
   CheckCircle,
   XCircle,
   X,
-  ImageIcon,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Image from "next/image"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import ProjectLoading from "./loading"
 
-interface BrandData {
+interface ProjectData {
   id: number
   name: string
-  note: string | null
-  image: string | null
   description: string
+  note: string | null
+  type: "image/video" | "text" | "mixed" | "web" | "mobile"
+  brand_id: string
+  file: string | null
+  file2: string | null
+  file3: string | null
+  file4: string | null
+  file5: string | null
+  file6: string | null
+  file7: string | null
+  file8: string | null
+  file9: string | null
+  file10: string | null
   created_at: string
   updated_at: string
-}
-
-interface BrandDetailData {
-  general: {
-    id: number
-    name: string
-    note: string | null
-    image: string | null
-    description: string
-    created_at: string
-    updated_at: string
-  }
+  // Tambahkan field designer
+  designer: string | null
 }
 
 interface PaginationLink {
@@ -72,7 +78,7 @@ interface ApiResponse {
   message: string
   data: {
     data: {
-      data: BrandData[]
+      data: ProjectData[]
     }
     meta: {
       current_page: number
@@ -101,8 +107,19 @@ interface ToastNotification {
   message: string
 }
 
-export default function BrandPage() {
-  const [brands, setBrands] = useState<BrandData[]>([])
+const PROJECT_TYPES = [
+  { value: "image/video", label: "Image/Video", icon: ImageIcon },
+  { value: "text", label: "Text", icon: FileText },
+  { value: "mixed", label: "Mixed", icon: FolderOpen },
+  { value: "web", label: "Web", icon: Globe },
+  { value: "mobile", label: "Mobile", icon: Smartphone },
+]
+
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_API_URL}/admins/project`
+const STORAGE_BASE_URL = `${process.env.NEXT_PUBLIC_API_BASE_URL}/storage/`
+
+export default function ProjectPage() {
+  const [projects, setProjects] = useState<ProjectData[]>([])
   const [searchValue, setSearchValue] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -110,43 +127,70 @@ export default function BrandPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
-  const [selectedBrand, setSelectedBrand] = useState<BrandData | null>(null)
+  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [detailError, setDetailError] = useState("")
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [apiError, setApiError] = useState("")
   const router = useRouter()
 
-  // Add these state variables after the existing state declarations
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isCreatingBrand, setIsCreatingBrand] = useState(false)
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
   const [createMessage, setCreateMessage] = useState("")
-  const [newBrand, setNewBrand] = useState({
+  const [newProject, setNewProject] = useState({
     name: "",
     description: "",
     note: "",
+    type: "image/video" as "image/video" | "text" | "mixed" | "web" | "mobile",
+    brand_id: "",
+    // Tambahkan designer ke state newProject
+    designer: "",
   })
-  const [brandImage, setBrandImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [projectFile, setProjectFile] = useState<File | null>(null)
+  const [projectFile2, setProjectFile2] = useState<File | null>(null)
+  const [projectFile3, setProjectFile3] = useState<File | null>(null)
+  const [projectFile4, setProjectFile4] = useState<File | null>(null)
+  const [projectFile5, setProjectFile5] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  const [filePreview2, setFilePreview2] = useState<string | null>(null)
+  const [filePreview3, setFilePreview3] = useState<string | null>(null)
+  const [filePreview4, setFilePreview4] = useState<string | null>(null)
+  const [filePreview5, setFilePreview5] = useState<string | null>(null)
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [brandToDelete, setBrandToDelete] = useState<BrandData | null>(null)
-  const [isDeletingBrand, setIsDeletingBrand] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<ProjectData | null>(null)
+  const [isDeletingProject, setIsDeletingProject] = useState(false)
   const [deleteMessage, setDeleteMessage] = useState("")
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [brandToEdit, setBrandToEdit] = useState<BrandData | null>(null)
-  const [isEditingBrand, setIsEditingBrand] = useState(false)
+  const [projectToEdit, setProjectToEdit] = useState<ProjectData | null>(null)
+  const [isEditingProject, setIsEditingProject] = useState(false)
   const [isLoadingEditData, setIsLoadingEditData] = useState(false)
   const [editMessage, setEditMessage] = useState("")
-  const [editBrand, setEditBrand] = useState({
+  const [editProjectData, setEditProjectData] = useState({
     name: "",
     description: "",
     note: "",
+    type: "image/video" as "image/video" | "text" | "mixed" | "web" | "mobile",
+    brand_id: "",
+    // Tambahkan designer ke state editProjectData
+    designer: "",
   })
-  const [editBrandImage, setEditBrandImage] = useState<File | null>(null)
-  const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
-  const [currentBrandImage, setCurrentBrandImage] = useState<string | null>(null)
+  const [editProjectFile, setEditProjectFile] = useState<File | null>(null)
+  const [editProjectFile2, setEditProjectFile2] = useState<File | null>(null)
+  const [editProjectFile3, setEditProjectFile3] = useState<File | null>(null)
+  const [editProjectFile4, setEditProjectFile4] = useState<File | null>(null)
+  const [editProjectFile5, setEditProjectFile5] = useState<File | null>(null)
+  const [editFilePreview, setEditFilePreview] = useState<string | null>(null)
+  const [editFilePreview2, setEditFilePreview2] = useState<string | null>(null)
+  const [editFilePreview3, setEditFilePreview3] = useState<string | null>(null)
+  const [editFilePreview4, setEditFilePreview4] = useState<string | null>(null)
+  const [editFilePreview5, setEditFilePreview5] = useState<string | null>(null)
+  const [currentProjectFile, setCurrentProjectFile] = useState<string | null>(null)
+  const [currentProjectFile2, setCurrentProjectFile2] = useState<string | null>(null)
+  const [currentProjectFile3, setCurrentProjectFile3] = useState<string | null>(null)
+  const [currentProjectFile4, setCurrentProjectFile4] = useState<string | null>(null)
+  const [currentProjectFile5, setCurrentProjectFile5] = useState<string | null>(null)
 
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
@@ -154,7 +198,6 @@ export default function BrandPage() {
     const newToast: ToastNotification = { id, type, title, message }
     setToasts((prev) => [...prev, newToast])
 
-    // Auto remove toast after 5 seconds
     setTimeout(() => {
       removeToast(id)
     }, 5000)
@@ -164,30 +207,127 @@ export default function BrandPage() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
   }
 
-  // Fetch brands data from API
-  const fetchBrands = async (page = 1, value = "") => {
+  // Fetch projects data from API
+  const fetchProjects = useCallback(
+    async (page = 1, value = "") => {
+      try {
+        const token = localStorage.getItem("token")
+
+        if (!token) {
+          setApiError("No authentication token found. Please login.")
+          setIsLoading(false)
+          setIsSearching(false)
+          router.push("/login")
+          return
+        }
+
+        setIsSearching(true)
+        setApiError("")
+
+        const params = new URLSearchParams()
+        if (page > 1) params.append("page", page.toString())
+        if (value.trim()) {
+          params.append("name", value.trim())
+        }
+
+        const url = `${API_BASE_URL}${params.toString() ? `?${params.toString()}` : ""}`
+
+        console.log("Fetching projects from:", url)
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        console.log("Response status:", response.status)
+
+        if (response.status === 401) {
+          console.log("Unauthorized access, redirecting to login")
+          localStorage.removeItem("token")
+          router.push("/login")
+          return
+        }
+
+        let responseData: any
+        try {
+          responseData = await response.json()
+          console.log("API Response:", responseData)
+        } catch (parseError) {
+          console.error("Failed to parse JSON response:", parseError)
+          setApiError(`Failed to parse server response. Status: ${response.status}`)
+          setProjects([])
+          return
+        }
+
+        if (response.ok) {
+          if (responseData.success === false) {
+            setApiError(responseData.message || "API returned success: false")
+            addToast("error", "Error", responseData.message || "Failed to fetch projects")
+            setProjects([])
+            setCurrentPage(1)
+            setTotalPages(1)
+            setTotalItems(0)
+            return
+          }
+
+          if (
+            responseData.data &&
+            responseData.data.data &&
+            responseData.data.data.data &&
+            Array.isArray(responseData.data.data.data)
+          ) {
+            const projectsList = responseData.data.data.data
+            setProjects(projectsList)
+            setCurrentPage(responseData.data.meta.current_page)
+            setTotalPages(responseData.data.meta.last_page)
+            setTotalItems(responseData.data.meta.total)
+            console.log("Projects loaded successfully:", projectsList.length, "projects")
+          } else {
+            console.error("Unexpected API response structure:", responseData)
+            setApiError(
+              `Unexpected data format from server. Expected array of projects but got: ${typeof responseData.data}`,
+            )
+            setProjects([])
+          }
+        } else {
+          const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
+          setApiError(errorMessage)
+          addToast("error", "API Error", errorMessage)
+          setProjects([])
+          console.error("API Error:", errorMessage)
+        }
+      } catch (error) {
+        console.error("Network error:", error)
+        const errorMessage = error instanceof Error ? error.message : "Unknown network error"
+        setApiError(`Network error: ${errorMessage}`)
+        addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
+        setProjects([])
+      } finally {
+        setIsLoading(false)
+        setIsSearching(false)
+      }
+    },
+    [router],
+  )
+
+  // Handle view detail
+  const handleViewDetail = async (project: ProjectData) => {
+    setIsLoadingDetail(true)
+    setDetailError("")
+
     try {
       const token = localStorage.getItem("token")
 
       if (!token) {
-        setApiError("No authentication token found. Please login.")
-        setIsLoading(false)
-        setIsSearching(false)
+        setDetailError("No authentication token found. Please login.")
+        setIsLoadingDetail(false)
         return
       }
 
-      setIsSearching(true)
-      setApiError("")
-
-      const params = new URLSearchParams()
-      if (page > 1) params.append("page", page.toString())
-      if (value.trim()) {
-        params.append("name", value.trim())
-      }
-
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/admins/brand${params.toString() ? `?${params.toString()}` : ""}`
-
-      console.log("Fetching brands from:", url)
+      const url = `${API_BASE_URL}/${project.id}`
 
       const response = await fetch(url, {
         method: "GET",
@@ -197,108 +337,77 @@ export default function BrandPage() {
         },
       })
 
-      console.log("Response status:", response.status)
+      const data = await response.json()
 
-      // Only redirect to login if we get a 401 Unauthorized
       if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
         localStorage.removeItem("token")
         router.push("/login")
         return
       }
 
-      let responseData: any
-      try {
-        responseData = await response.json()
-        console.log("API Response:", responseData)
-      } catch (parseError) {
-        console.error("Failed to parse JSON response:", parseError)
-        setApiError(`Failed to parse server response. Status: ${response.status}`)
-        setBrands([])
-        return
-      }
-
-      if (response.ok) {
-        // Check if response has success field and it's false
-        if (responseData.success === false) {
-          setApiError(responseData.message || "API returned success: false")
-          addToast("error", "Error", responseData.message || "Failed to fetch brands")
-          setBrands([])
-          setCurrentPage(1)
-          setTotalPages(1)
-          setTotalItems(0)
-          return
+      if (response.ok && data.success) {
+        // Map the response to ProjectData
+        const detailProject: ProjectData = {
+          id: data.data.general.id,
+          name: data.data.general.name,
+          description: data.data.general.description,
+          note: data.data.general.note,
+          type: data.data.general.type,
+          brand_id: data.data.general.brand,
+          file: data.data.general.file,
+          file2: data.data.general.file2,
+          file3: data.data.general.file3,
+          file4: data.data.general.file4,
+          file5: data.data.general.file5,
+          file6: null,
+          file7: null,
+          file8: null,
+          file9: null,
+          file10: null,
+          created_at: data.data.general.created_at,
+          updated_at: data.data.general.updated_at,
+          designer: data.data.general.designer,
         }
 
-        // Extract data from the correct structure: data.data.data
-        if (
-          responseData.data &&
-          responseData.data.data &&
-          responseData.data.data.data &&
-          Array.isArray(responseData.data.data.data)
-        ) {
-          const brandsList = responseData.data.data.data
-          setBrands(brandsList)
-          setCurrentPage(responseData.data.meta.current_page)
-          setTotalPages(responseData.data.meta.last_page)
-          setTotalItems(responseData.data.meta.total)
-          console.log("Brands loaded successfully:", brandsList.length, "brands")
-        } else {
-          console.error("Unexpected API response structure:", responseData)
-          setApiError(
-            `Unexpected data format from server. Expected array of brands but got: ${typeof responseData.data}`,
-          )
-          setBrands([])
-        }
+        setSelectedProject(detailProject)
+        setIsDetailDialogOpen(true)
       } else {
-        // Handle error response
-        const errorMessage = responseData?.message || `HTTP ${response.status}: ${response.statusText}`
-        setApiError(errorMessage)
-        addToast("error", "API Error", errorMessage)
-        setBrands([])
-        console.error("API Error:", errorMessage)
+        setDetailError(data.message || "Failed to load project details")
+        addToast("error", "Error", data.message || "Failed to load project details")
       }
     } catch (error) {
-      console.error("Network error:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown network error"
-      setApiError(`Network error: ${errorMessage}`)
-      addToast("error", "Network Error", "Failed to connect to server. Please check your connection.")
-      setBrands([])
+      console.error("Fetch detail error:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      setDetailError(`Network error: ${errorMessage}`)
+      addToast("error", "Network Error", "Failed to load project details")
     } finally {
-      setIsLoading(false)
-      setIsSearching(false)
+      setIsLoadingDetail(false)
     }
-  }
-
-  // Handle view detail
-  const handleViewDetail = (brand: BrandData) => {
-    setSelectedBrand(brand)
-    setIsDetailDialogOpen(true)
   }
 
   // Initial load
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchBrands()
+      fetchProjects()
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [])
+  }, [fetchProjects])
 
   // Handle search with debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
-      fetchBrands(1, searchValue)
+      fetchProjects(1, searchValue)
     }, 500)
 
     return () => clearTimeout(timeoutId)
-  }, [searchValue])
+  }, [searchValue, fetchProjects])
 
   // Handle pagination
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
-    fetchBrands(page, searchValue)
+    fetchProjects(page, searchValue)
   }
 
   // Handle search value change
@@ -310,31 +419,43 @@ export default function BrandPage() {
   const handleClearSearch = () => {
     setSearchValue("")
     setCurrentPage(1)
-    fetchBrands(1, "")
+    fetchProjects(1, "")
   }
 
   // Statistics based on current data
+  const totalProjects = totalItems
+  const projectsWithFiles = projects.filter((p) => p.file).length
+  const imageVideoProjects = projects.filter((p) => p.type === "image/video").length
+  const textProjects = projects.filter((p) => p.type === "text").length
+
   const stats = [
     {
-      title: "Total Brands",
-      value: totalItems.toString(),
-      description: "All registered brands",
-      icon: Award,
-      color: "text-purple-600",
+      title: "Total Projects",
+      value: totalProjects.toString(),
+      description: "All registered projects",
+      icon: FolderOpen,
+      color: "text-blue-600",
     },
     {
-      title: "Active Brands",
-      value: brands.length.toString(),
-      description: "Currently displayed",
-      icon: Package,
+      title: "Projects with Files",
+      value: projectsWithFiles.toString(),
+      description: "Projects with attached images/files",
+      icon: ImageIcon,
       color: "text-green-600",
     },
     {
-      title: "With Images",
-      value: brands.filter((brand) => brand.image).length.toString(),
-      description: "Brands with images",
+      title: "Image/Video Projects",
+      value: imageVideoProjects.toString(),
+      description: "Projects primarily featuring visuals",
       icon: ImageIcon,
-      color: "text-blue-600",
+      color: "text-red-600",
+    },
+    {
+      title: "Text Projects",
+      value: textProjects.toString(),
+      description: "Projects primarily featuring text content",
+      icon: FileText,
+      color: "text-purple-600",
     },
   ]
 
@@ -356,51 +477,105 @@ export default function BrandPage() {
     })
   }
 
-  const getBrandImage = (imagePath: string | null) => {
-    if (!imagePath) return "/placeholder.svg?height=40&width=40"
+  const getProjectFileUrl = (filePath: string | null) => {
+    if (!filePath) return "/placeholder.svg?height=40&width=40"
 
-    // If it's already a full URL, return as is
-    if (imagePath.startsWith("http")) return imagePath
+    if (filePath.startsWith("http")) return filePath
 
-    // Otherwise, construct the full URL
-    return `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}/storage/${imagePath}`
+    return `${STORAGE_BASE_URL}${filePath}`
   }
 
-  // Add this function to handle file input change
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file input change for Add Project
+  const handleAddFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileNumber = 1) => {
     const file = e.target.files?.[0] || null
-    setBrandImage(file)
 
-    // Create preview URL for the selected image
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
+    if (fileNumber === 1) {
+      setProjectFile(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFilePreview(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setFilePreview(null)
       }
-      reader.readAsDataURL(file)
-    } else {
-      setImagePreview(null)
+    } else if (fileNumber === 2) {
+      setProjectFile2(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFilePreview2(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setFilePreview2(null)
+      }
+    } else if (fileNumber === 3) {
+      setProjectFile3(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFilePreview3(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setFilePreview3(null)
+      }
+    } else if (fileNumber === 4) {
+      setProjectFile4(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFilePreview4(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setFilePreview4(null)
+      }
+    } else if (fileNumber === 5) {
+      setProjectFile5(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setFilePreview5(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setFilePreview5(null)
+      }
     }
   }
 
-  // Add this function to handle add dialog open/close
+  // Handle add dialog open/close
   const handleAddDialogOpen = (open: boolean) => {
     setIsAddDialogOpen(open)
     if (!open) {
-      // Reset form when closing
-      setNewBrand({
+      setNewProject({
         name: "",
         description: "",
         note: "",
+        type: "image/video",
+        brand_id: "",
+        // Reset designer
+        designer: "",
       })
-      setBrandImage(null)
-      setImagePreview(null)
+      setProjectFile(null)
+      setProjectFile2(null)
+      setProjectFile3(null)
+      setProjectFile4(null)
+      setProjectFile5(null)
+      setFilePreview(null)
+      setFilePreview2(null)
+      setFilePreview3(null)
+      setFilePreview4(null)
+      setFilePreview5(null)
       setCreateMessage("")
     }
   }
 
-  // Add this function to create a new brand
-  const createBrand = async () => {
+  // Create a new project
+  const createProject = async () => {
     try {
       const token = localStorage.getItem("token")
 
@@ -410,28 +585,44 @@ export default function BrandPage() {
         return
       }
 
-      setIsCreatingBrand(true)
+      setIsCreatingProject(true)
       setCreateMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
-      formData.append("name", newBrand.name)
-      formData.append("description", newBrand.description)
+      formData.append("name", newProject.name)
+      formData.append("description", newProject.description)
+      formData.append("type", newProject.type)
+      formData.append("brand_id", newProject.brand_id)
 
-      if (newBrand.note) {
-        formData.append("note", newBrand.note)
+      if (newProject.note) {
+        formData.append("note", newProject.note)
       }
 
-      if (brandImage) {
-        formData.append("image", brandImage)
+      // Tambahkan designer ke formData
+      if (newProject.designer) {
+        formData.append("designer", newProject.designer)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand`, {
+      if (projectFile) {
+        formData.append("file", projectFile)
+      }
+      if (projectFile2) {
+        formData.append("file2", projectFile2)
+      }
+      if (projectFile3) {
+        formData.append("file3", projectFile3)
+      }
+      if (projectFile4) {
+        formData.append("file4", projectFile4)
+      }
+      if (projectFile5) {
+        formData.append("file5", projectFile5)
+      }
+
+      const response = await fetch(API_BASE_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
-          // It will be set automatically with the correct boundary
         },
         body: formData,
       })
@@ -446,57 +637,61 @@ export default function BrandPage() {
       }
 
       if (response.ok && data.success) {
-        // Show success toast
-        addToast("success", "Brand Created", `Brand "${newBrand.name}" has been successfully created.`)
-
-        // Reset form
-        setNewBrand({
+        addToast("success", "Project Created", `Project "${newProject.name}" has been successfully created.`)
+        setNewProject({
           name: "",
           description: "",
           note: "",
+          type: "image/video",
+          brand_id: "",
+          // Reset designer
+          designer: "",
         })
-        setBrandImage(null)
-        setImagePreview(null)
-
-        // Refresh brand list
-        fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
+        setProjectFile(null)
+        setProjectFile2(null)
+        setProjectFile3(null)
+        setProjectFile4(null)
+        setProjectFile5(null)
+        setFilePreview(null)
+        setFilePreview2(null)
+        setFilePreview3(null)
+        setFilePreview4(null)
+        setFilePreview5(null)
+        fetchProjects(currentPage, searchValue)
         setTimeout(() => {
           setIsAddDialogOpen(false)
           setCreateMessage("")
         }, 2000)
       } else {
-        setCreateMessage(data.message || `Failed to create brand (Status: ${response.status})`)
+        setCreateMessage(data.message || `Failed to create project (Status: ${response.status})`)
       }
     } catch (error) {
-      console.error("Create brand API error:", error)
-      setCreateMessage("Network error occurred while creating brand")
+      console.error("Create project API error:", error)
+      setCreateMessage("Network error occurred while creating project")
     } finally {
-      setIsCreatingBrand(false)
+      setIsCreatingProject(false)
     }
   }
 
-  // Add this function to handle form submission
-  const handleAddBrand = () => {
-    if (!newBrand.name) {
-      setCreateMessage("Please enter a brand name")
+  // Handle add form submission
+  const handleAddProject = () => {
+    if (!newProject.name || !newProject.description || !newProject.brand_id) {
+      setCreateMessage("Please fill in all required fields (Name, Description, Brand ID)")
       return
     }
-
-    createBrand()
+    createProject()
   }
 
-  // Handle delete brand
-  const handleDeleteBrand = (brand: BrandData) => {
-    setBrandToDelete(brand)
+  // Handle delete project
+  const handleDeleteProject = (project: ProjectData) => {
+    setProjectToDelete(project)
     setIsDeleteDialogOpen(true)
     setDeleteMessage("")
   }
 
-  // Delete brand function
-  const deleteBrand = async () => {
-    if (!brandToDelete) return
+  // Delete project function
+  const deleteProject = async () => {
+    if (!projectToDelete) return
 
     try {
       const token = localStorage.getItem("token")
@@ -507,10 +702,10 @@ export default function BrandPage() {
         return
       }
 
-      setIsDeletingBrand(true)
+      setIsDeletingProject(true)
       setDeleteMessage("")
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/${projectToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -528,41 +723,36 @@ export default function BrandPage() {
       }
 
       if (response.ok && data.success) {
-        // Show success toast
-        addToast("success", "Brand Deleted", `Brand "${brandToDelete.name}" has been successfully deleted.`)
-
-        // Refresh brand list
-        fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
+        addToast("success", "Project Deleted", `Project "${projectToDelete.name}" has been successfully deleted.`)
+        fetchProjects(currentPage, searchValue)
         setTimeout(() => {
           setIsDeleteDialogOpen(false)
-          setBrandToDelete(null)
+          setProjectToDelete(null)
           setDeleteMessage("")
         }, 1500)
       } else {
-        setDeleteMessage(data.message || `Failed to delete brand (Status: ${response.status})`)
+        setDeleteMessage(data.message || `Failed to delete project (Status: ${response.status})`)
       }
     } catch (error) {
-      console.error("Delete brand API error:", error)
-      setDeleteMessage("Network error occurred while deleting brand")
+      console.error("Delete project API error:", error)
+      setDeleteMessage("Network error occurred while deleting project")
     } finally {
-      setIsDeletingBrand(false)
+      setIsDeletingProject(false)
     }
   }
 
   // Handle delete dialog close
   const handleDeleteDialogClose = () => {
-    if (!isDeletingBrand) {
+    if (!isDeletingProject) {
       setIsDeleteDialogOpen(false)
-      setBrandToDelete(null)
+      setProjectToDelete(null)
       setDeleteMessage("")
     }
   }
 
-  // Handle edit brand
-  const handleEditBrand = async (brand: BrandData) => {
-    setBrandToEdit(brand)
+  // Handle edit project
+  const handleEditProject = async (project: ProjectData) => {
+    setProjectToEdit(project)
     setIsEditDialogOpen(true)
     setEditMessage("")
     setIsLoadingEditData(true)
@@ -576,81 +766,136 @@ export default function BrandPage() {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand-edit/${brand.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+      setEditProjectData({
+        name: project.name || "",
+        description: project.description || "",
+        note: project.note || "",
+        type: project.type || "image/video",
+        brand_id: project.brand_id || "",
+        // Set nilai designer dari data project
+        designer: project.designer || "",
       })
-
-      const data = await response.json()
-
-      if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
-      if (response.ok && data.success) {
-        // Populate form with existing data
-        setEditBrand({
-          name: data.data.name || "",
-          description: data.data.description || "",
-          note: data.data.note || "",
-        })
-        setCurrentBrandImage(data.data.image)
-        setEditImagePreview(null)
-        setEditBrandImage(null)
-      } else {
-        setEditMessage(data.message || `Failed to load brand data (Status: ${response.status})`)
-      }
+      setCurrentProjectFile(project.file)
+      setCurrentProjectFile2(project.file2)
+      setCurrentProjectFile3(project.file3)
+      setCurrentProjectFile4(project.file4)
+      setCurrentProjectFile5(project.file5)
+      setEditFilePreview(null)
+      setEditFilePreview2(null)
+      setEditFilePreview3(null)
+      setEditFilePreview4(null)
+      setEditFilePreview5(null)
+      setEditProjectFile(null)
+      setEditProjectFile2(null)
+      setEditProjectFile3(null)
+      setEditProjectFile4(null)
+      setEditProjectFile5(null)
     } catch (error) {
-      console.error("Load brand data API error:", error)
-      setEditMessage("Network error occurred while loading brand data")
+      console.error("Load project data error:", error)
+      setEditMessage("Error loading project data for editing.")
     } finally {
       setIsLoadingEditData(false)
     }
   }
 
-  // Handle edit image change
-  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle edit file change
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileNumber = 1) => {
     const file = e.target.files?.[0] || null
-    setEditBrandImage(file)
 
-    // Create preview URL for the selected image
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setEditImagePreview(reader.result as string)
+    if (fileNumber === 1) {
+      setEditProjectFile(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setEditFilePreview(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setEditFilePreview(null)
       }
-      reader.readAsDataURL(file)
-    } else {
-      setEditImagePreview(null)
+    } else if (fileNumber === 2) {
+      setEditProjectFile2(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setEditFilePreview2(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setEditFilePreview2(null)
+      }
+    } else if (fileNumber === 3) {
+      setEditProjectFile3(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setEditFilePreview3(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setEditFilePreview3(null)
+      }
+    } else if (fileNumber === 4) {
+      setEditProjectFile4(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setEditFilePreview4(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setEditFilePreview4(null)
+      }
+    } else if (fileNumber === 5) {
+      setEditProjectFile5(file)
+      if (file) {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setEditFilePreview5(reader.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setEditFilePreview5(null)
+      }
     }
   }
 
   // Handle edit dialog close
   const handleEditDialogClose = () => {
-    if (!isEditingBrand && !isLoadingEditData) {
+    if (!isEditingProject && !isLoadingEditData) {
       setIsEditDialogOpen(false)
-      setBrandToEdit(null)
+      setProjectToEdit(null)
       setEditMessage("")
-      setEditBrand({
+      setEditProjectData({
         name: "",
         description: "",
         note: "",
+        type: "image/video",
+        brand_id: "",
+        // Reset designer
+        designer: "",
       })
-      setEditBrandImage(null)
-      setEditImagePreview(null)
-      setCurrentBrandImage(null)
+      setEditProjectFile(null)
+      setEditProjectFile2(null)
+      setEditProjectFile3(null)
+      setEditProjectFile4(null)
+      setEditProjectFile5(null)
+      setEditFilePreview(null)
+      setEditFilePreview2(null)
+      setEditFilePreview3(null)
+      setEditFilePreview4(null)
+      setEditFilePreview5(null)
+      setCurrentProjectFile(null)
+      setCurrentProjectFile2(null)
+      setCurrentProjectFile3(null)
+      setCurrentProjectFile4(null)
+      setCurrentProjectFile5(null)
     }
   }
 
-  // Update brand function
-  const updateBrand = async () => {
-    if (!brandToEdit) return
+  // Update project function
+  const updateProject = async () => {
+    if (!projectToEdit) return
 
     try {
       const token = localStorage.getItem("token")
@@ -661,28 +906,45 @@ export default function BrandPage() {
         return
       }
 
-      setIsEditingBrand(true)
+      setIsEditingProject(true)
       setEditMessage("")
 
-      // Create FormData object to handle file upload
       const formData = new FormData()
-      formData.append("name", editBrand.name)
-      formData.append("description", editBrand.description)
+      formData.append("name", editProjectData.name)
+      formData.append("description", editProjectData.description)
+      formData.append("type", editProjectData.type)
+      formData.append("brand_id", editProjectData.brand_id)
       formData.append("_method", "PUT")
 
-      if (editBrand.note) {
-        formData.append("note", editBrand.note)
+      if (editProjectData.note) {
+        formData.append("note", editProjectData.note)
       }
 
-      if (editBrandImage) {
-        formData.append("image", editBrandImage)
+      // Tambahkan designer ke formData
+      if (editProjectData.designer) {
+        formData.append("designer", editProjectData.designer)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/brand/${brandToEdit.id}`, {
+      if (editProjectFile) {
+        formData.append("file", editProjectFile)
+      }
+      if (editProjectFile2) {
+        formData.append("file2", editProjectFile2)
+      }
+      if (editProjectFile3) {
+        formData.append("file3", editProjectFile3)
+      }
+      if (editProjectFile4) {
+        formData.append("file4", editProjectFile4)
+      }
+      if (editProjectFile5) {
+        formData.append("file5", editProjectFile5)
+      }
+
+      const response = await fetch(`${API_BASE_URL}/${projectToEdit.id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          // Don't set Content-Type header when using FormData
         },
         body: formData,
       })
@@ -697,64 +959,117 @@ export default function BrandPage() {
       }
 
       if (response.ok && data.success) {
-        // Show success toast
-        addToast("success", "Brand Updated", `Brand "${editBrand.name}" has been successfully updated.`)
-
-        // Refresh brand list
-        fetchBrands(currentPage, searchValue)
-
-        // Close dialog after a short delay
+        addToast("success", "Project Updated", `Project "${editProjectData.name}" has been successfully updated.`)
+        fetchProjects(currentPage, searchValue)
         setTimeout(() => {
           setIsEditDialogOpen(false)
-          setBrandToEdit(null)
+          setProjectToEdit(null)
           setEditMessage("")
         }, 2000)
       } else {
-        setEditMessage(data.message || `Failed to update brand (Status: ${response.status})`)
+        setEditMessage(data.message || `Failed to update project (Status: ${response.status})`)
       }
     } catch (error) {
-      console.error("Update brand API error:", error)
-      setEditMessage("Network error occurred while updating brand")
+      console.error("Update project API error:", error)
+      setEditMessage("Network error occurred while updating project")
     } finally {
-      setIsEditingBrand(false)
+      setIsEditingProject(false)
     }
   }
 
   // Handle edit form submission
-  const handleUpdateBrand = () => {
-    if (!editBrand.name) {
-      setEditMessage("Please enter a brand name")
+  const handleUpdateProject = () => {
+    if (!editProjectData.name || !editProjectData.description || !editProjectData.brand_id) {
+      setEditMessage("Please fill in all required fields (Name, Description, Brand ID)")
       return
     }
+    updateProject()
+  }
 
-    updateBrand()
+  // File preview component
+  const FilePreviewSection = (props: {
+    fileNumber: number
+    filePreview: string | null
+    currentFile: string | null
+    onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    onRemove: () => void
+    isLoading: boolean
+  }) => {
+    return (
+      <div className="space-y-2">
+        {props.filePreview ? (
+          <div className="relative">
+            <div className="w-full h-40 rounded-lg overflow-hidden border-2 border-dashed border-blue-300 bg-blue-50">
+              {props.filePreview.startsWith("data:image") ? (
+                <Image
+                  src={props.filePreview || "/placeholder.svg"}
+                  alt={`New file ${props.fileNumber}`}
+                  fill
+                  className="object-contain p-2"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-full h-full bg-blue-100 text-blue-500">
+                  <FileText className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md"
+              onClick={props.onRemove}
+              disabled={props.isLoading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">New File</div>
+          </div>
+        ) : props.currentFile ? (
+          <div className="relative">
+            <div className="w-full h-40 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+              {props.currentFile.match(/\.(jpeg|jpg|gif|png|svg)$/i) ? (
+                <Image
+                  src={getProjectFileUrl(props.currentFile) || "/placeholder.svg"}
+                  alt={`Current file ${props.fileNumber}`}
+                  fill
+                  className="object-contain p-2"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/placeholder.svg?height=160&width=320"
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center w-full h-full bg-slate-100 text-slate-500">
+                  <FileText className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+            <div className="absolute bottom-2 left-2 bg-slate-600 text-white text-xs px-2 py-1 rounded">
+              Current File
+            </div>
+          </div>
+        ) : (
+          <div className="w-full h-40 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
+            <div className="text-center">
+              <FolderOpen className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">No file uploaded</p>
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-slate-500">
+          {props.filePreview
+            ? "New file selected - will replace current file when saved"
+            : props.currentFile
+              ? "Current file - upload a new file to replace"
+              : "Upload a file (optional)"}
+        </p>
+      </div>
+    )
   }
 
   if (isLoading) {
-    return (
-      <div className="flex-1 space-y-6 p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Brand Management</h1>
-            <p className="text-slate-600 mt-2">Loading brand data...</p>
-          </div>
-        </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          {[...Array(3)].map((_, index) => (
-            <Card key={index} className="border-slate-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 bg-slate-200 rounded animate-pulse w-20"></div>
-                <div className="h-4 w-4 bg-slate-200 rounded animate-pulse"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-slate-200 rounded animate-pulse w-16 mb-2"></div>
-                <div className="h-3 bg-slate-200 rounded animate-pulse w-24"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    return <ProjectLoading />
   }
 
   return (
@@ -799,22 +1114,22 @@ export default function BrandPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Brand Management</h1>
-          <p className="text-slate-600 mt-2">Manage product brands and their information</p>
+          <h1 className="text-3xl font-bold text-slate-900">Project Management</h1>
+          <p className="text-slate-600 mt-2">Manage your projects, including details and associated files.</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={handleAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-slate-900 hover:bg-slate-800">
               <Plus className="w-4 h-4 mr-2" />
-              Add Brand
+              Add Project
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add New Brand</DialogTitle>
-              <DialogDescription>Create a new product brand</DialogDescription>
+              <DialogTitle>Add New Project</DialogTitle>
+              <DialogDescription>Create a new project entry</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
               {createMessage && (
                 <Alert
                   className={
@@ -830,65 +1145,24 @@ export default function BrandPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="name">Brand Name *</Label>
+                <Label htmlFor="name">Project Name *</Label>
                 <Input
                   id="name"
-                  value={newBrand.name}
-                  onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
-                  placeholder="Enter brand name"
-                  disabled={isCreatingBrand}
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                  placeholder="Enter project name"
+                  disabled={isCreatingProject}
                 />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="image">Brand Image</Label>
-                <div className="flex flex-col gap-2">
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    disabled={isCreatingBrand}
-                    className="cursor-pointer"
-                  />
-                  {imagePreview && (
-                    <div className="mt-2 relative">
-                      <div className="w-full h-32 rounded-md overflow-hidden border border-slate-200">
-                        <Image
-                          src={imagePreview || "/placeholder.svg"}
-                          alt="Image preview"
-                          fill
-                          className="object-contain"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full bg-slate-800/60 hover:bg-slate-800/80 text-white"
-                        onClick={() => {
-                          setBrandImage(null)
-                          setImagePreview(null)
-                        }}
-                        disabled={isCreatingBrand}
-                      >
-                        <X className="h-3 w-3" />
-                        <span className="sr-only">Remove image</span>
-                      </Button>
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-500">Upload a brand logo or image (optional)</p>
-                </div>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="description">Description *</Label>
                 <Textarea
                   id="description"
-                  value={newBrand.description}
-                  onChange={(e) => setNewBrand({ ...newBrand, description: e.target.value })}
-                  placeholder="Enter brand description"
-                  disabled={isCreatingBrand}
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                  placeholder="Enter project description"
+                  disabled={isCreatingProject}
                   rows={3}
                 />
               </div>
@@ -897,20 +1171,194 @@ export default function BrandPage() {
                 <Label htmlFor="note">Note</Label>
                 <Textarea
                   id="note"
-                  value={newBrand.note}
-                  onChange={(e) => setNewBrand({ ...newBrand, note: e.target.value })}
+                  value={newProject.note}
+                  onChange={(e) => setNewProject({ ...newProject, note: e.target.value })}
                   placeholder="Enter additional notes (optional)"
-                  disabled={isCreatingBrand}
+                  disabled={isCreatingProject}
                   rows={2}
                 />
               </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="type">Type *</Label>
+                <Select
+                  value={newProject.type}
+                  onValueChange={(value: "image/video" | "text" | "mixed" | "web" | "mobile") =>
+                    setNewProject({ ...newProject, type: value })
+                  }
+                  disabled={isCreatingProject}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <type.icon className="h-4 w-4" /> {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="brand_id">Brand ID *</Label>
+                <Input
+                  id="brand_id"
+                  value={newProject.brand_id}
+                  onChange={(e) => setNewProject({ ...newProject, brand_id: e.target.value })}
+                  placeholder="Enter brand ID"
+                  disabled={isCreatingProject}
+                />
+              </div>
+
+              {/* Tambahkan Designer field di sini */}
+              <div className="grid gap-2">
+                <Label htmlFor="designer">Designer</Label>
+                <Input
+                  id="designer"
+                  value={newProject.designer}
+                  onChange={(e) => setNewProject({ ...newProject, designer: e.target.value })}
+                  placeholder="Enter designer name (optional)"
+                  disabled={isCreatingProject}
+                />
+              </div>
+
+              <div className="grid gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-4">Project Files</h3>
+                  <div className="space-y-4">
+                    {/* File 1 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="file">Project File 1</Label>
+                      <Input
+                        id="file"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleAddFileChange(e, 1)}
+                        disabled={isCreatingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={1}
+                        filePreview={filePreview}
+                        currentFile={null}
+                        onFileChange={(e) => handleAddFileChange(e, 1)}
+                        onRemove={() => {
+                          setProjectFile(null)
+                          setFilePreview(null)
+                        }}
+                        isLoading={isCreatingProject}
+                      />
+                    </div>
+
+                    {/* File 2 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="file2">Project File 2</Label>
+                      <Input
+                        id="file2"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleAddFileChange(e, 2)}
+                        disabled={isCreatingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={2}
+                        filePreview={filePreview2}
+                        currentFile={null}
+                        onFileChange={(e) => handleAddFileChange(e, 2)}
+                        onRemove={() => {
+                          setProjectFile2(null)
+                          setFilePreview2(null)
+                        }}
+                        isLoading={isCreatingProject}
+                      />
+                    </div>
+
+                    {/* File 3 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="file3">Project File 3</Label>
+                      <Input
+                        id="file3"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleAddFileChange(e, 3)}
+                        disabled={isCreatingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={3}
+                        filePreview={filePreview3}
+                        currentFile={null}
+                        onFileChange={(e) => handleAddFileChange(e, 3)}
+                        onRemove={() => {
+                          setProjectFile3(null)
+                          setFilePreview3(null)
+                        }}
+                        isLoading={isCreatingProject}
+                      />
+                    </div>
+
+                    {/* File 4 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="file4">Project File 4</Label>
+                      <Input
+                        id="file4"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleAddFileChange(e, 4)}
+                        disabled={isCreatingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={4}
+                        filePreview={filePreview4}
+                        currentFile={null}
+                        onFileChange={(e) => handleAddFileChange(e, 4)}
+                        onRemove={() => {
+                          setProjectFile4(null)
+                          setFilePreview4(null)
+                        }}
+                        isLoading={isCreatingProject}
+                      />
+                    </div>
+
+                    {/* File 5 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="file5">Project File 5</Label>
+                      <Input
+                        id="file5"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleAddFileChange(e, 5)}
+                        disabled={isCreatingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={5}
+                        filePreview={filePreview5}
+                        currentFile={null}
+                        onFileChange={(e) => handleAddFileChange(e, 5)}
+                        onRemove={() => {
+                          setProjectFile5(null)
+                          setFilePreview5(null)
+                        }}
+                        isLoading={isCreatingProject}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => handleAddDialogOpen(false)} disabled={isCreatingBrand}>
+              <Button variant="outline" onClick={() => handleAddDialogOpen(false)} disabled={isCreatingProject}>
                 Cancel
               </Button>
-              <Button onClick={handleAddBrand} disabled={isCreatingBrand}>
-                {isCreatingBrand ? "Creating..." : "Create Brand"}
+              <Button onClick={handleAddProject} disabled={isCreatingProject}>
+                {isCreatingProject ? "Creating..." : "Create Project"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -918,7 +1366,7 @@ export default function BrandPage() {
       </div>
 
       {/* Statistics */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-4">
         {stats.map((stat, index) => (
           <Card key={index} className="border-slate-200 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -939,14 +1387,14 @@ export default function BrandPage() {
           <XCircle className="h-4 w-4" />
           <AlertDescription className="text-red-800">
             <div className="space-y-2">
-              <div className="font-medium">Error loading brands:</div>
+              <div className="font-medium">Error loading projects:</div>
               <div className="text-sm">{apiError}</div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
                   setApiError("")
-                  fetchBrands(currentPage, searchValue)
+                  fetchProjects(currentPage, searchValue)
                 }}
                 className="mt-2"
               >
@@ -962,17 +1410,16 @@ export default function BrandPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-slate-900">Product Brands</CardTitle>
+              <CardTitle className="text-slate-900">Project List</CardTitle>
               <CardDescription>
-                Showing {brands.length} of {totalItems} brands
+                Showing {projects.length} of {totalItems} projects
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
-              {/* Search Input */}
               <div className="relative w-64">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search brands by name..."
+                  placeholder="Search projects by name..."
                   value={searchValue}
                   onChange={(e) => handleSearchValueChange(e.target.value)}
                   className="pl-10 pr-10"
@@ -997,10 +1444,9 @@ export default function BrandPage() {
             </div>
           </div>
 
-          {/* Search Info */}
           {searchValue && (
             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-              Searching for brand name "{searchValue}"
+              Searching for project name "{searchValue}"
               {totalItems > 0 && ` - Found ${totalItems} result${totalItems > 1 ? "s" : ""}`}
             </div>
           )}
@@ -1009,25 +1455,25 @@ export default function BrandPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[80px]">File</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Brand</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {brands.length > 0 ? (
-                brands.map((brand) => (
-                  <TableRow key={brand.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center space-x-3">
+              {projects.length > 0 ? (
+                projects.map((project) => {
+                  const ProjectTypeIcon = PROJECT_TYPES.find((type) => type.value === project.type)?.icon || FolderOpen
+                  return (
+                    <TableRow key={project.id}>
+                      <TableCell className="font-medium">
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
-                          {brand.image ? (
+                          {project.file ? (
                             <Image
-                              src={getBrandImage(brand.image) || "/placeholder.svg"}
-                              alt={brand.name}
+                              src={getProjectFileUrl(project.file) || "/placeholder.svg"}
+                              alt={project.name}
                               width={40}
                               height={40}
                               className="w-full h-full object-cover"
@@ -1037,70 +1483,73 @@ export default function BrandPage() {
                               }}
                             />
                           ) : (
-                            <Award className="w-5 h-5 text-slate-400" />
+                            <FolderOpen className="w-5 h-5 text-slate-400" />
                           )}
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{brand.name}</p>
-                          <p className="text-xs text-slate-500">ID: {brand.id}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-slate-600 max-w-xs">
-                      <p className="truncate">{brand.description || "No description"}</p>
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {brand.note ? (
-                        <Badge variant="outline" className="text-xs">
-                          {brand.note}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <p className="font-medium text-slate-900">{project.name}</p>
+                        <p className="text-xs text-slate-500">ID: {project.id}</p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={cn(
+                            "flex items-center gap-1",
+                            project.type === "image/video" && "bg-red-100 text-red-800 hover:bg-red-100",
+                            project.type === "text" && "bg-blue-100 text-blue-800 hover:bg-blue-100",
+                            project.type === "mixed" && "bg-purple-100 text-purple-800 hover:bg-purple-100",
+                            project.type === "web" && "bg-green-100 text-green-800 hover:bg-green-100",
+                            project.type === "mobile" && "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
+                          )}
+                        >
+                          <ProjectTypeIcon className="h-3 w-3" />
+                          {PROJECT_TYPES.find((type) => type.value === project.type)?.label || project.type}
                         </Badge>
-                      ) : (
-                        <span className="text-slate-400">No note</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-slate-600">{formatDate(brand.created_at)}</TableCell>
-                    <TableCell className="text-slate-600">{formatDate(brand.updated_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDetail(brand)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-slate-600 hover:text-slate-800"
-                          onClick={() => handleEditBrand(brand)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-800"
-                          onClick={() => handleDeleteBrand(brand)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell className="text-slate-600">{project.brand_id}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDetail(project)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-slate-600 hover:text-slate-800"
+                            onClick={() => handleEditProject(project)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-800"
+                            onClick={() => handleDeleteProject(project)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                    {searchValue ? `No brands found with name matching "${searchValue}".` : "No brand data available."}
+                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                    {searchValue
+                      ? `No projects found with name matching "${searchValue}".`
+                      : "No project data available."}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-slate-600">
@@ -1154,150 +1603,220 @@ export default function BrandPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Eye className="w-5 h-5 text-blue-600" />
-              <span>Brand Details</span>
+              <span>Project Details</span>
             </DialogTitle>
-            <DialogDescription>Detailed information about the selected brand</DialogDescription>
+            <DialogDescription>Detailed information about the selected project</DialogDescription>
           </DialogHeader>
 
           <div className="py-4 max-h-[70vh] overflow-y-auto">
-            {selectedBrand && (
-              <div className="space-y-6">
-                {/* Header Info */}
-                <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center">
-                    {selectedBrand.image ? (
-                      <Image
-                        src={getBrandImage(selectedBrand.image) || "/placeholder.svg"}
-                        alt={selectedBrand.name}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=64&width=64"
-                        }}
-                      />
-                    ) : (
-                      <Award className="w-8 h-8 text-slate-600" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-slate-900">{selectedBrand.name}</h3>
-                    <p className="text-slate-600">{selectedBrand.description || "No description"}</p>
-                    {selectedBrand.note && (
-                      <Badge variant="outline" className="mt-2">
-                        {selectedBrand.note}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* Detailed Information */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                      <Award className="w-5 h-5 text-purple-600" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Brand Name</p>
-                        <p className="text-slate-900">{selectedBrand.name}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                      <Package className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Description</p>
-                        <p className="text-slate-900">{selectedBrand.description || "No description"}</p>
-                      </div>
-                    </div>
-
-                    {selectedBrand.note && (
-                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                        <ImageIcon className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">Note</p>
-                          <p className="text-slate-900">{selectedBrand.note}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                      <Calendar className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Created At</p>
-                        <p className="text-slate-900">{formatDateTime(selectedBrand.created_at)}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                      <Calendar className="w-5 h-5 text-slate-600" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Updated At</p>
-                        <p className="text-slate-900">{formatDateTime(selectedBrand.updated_at)}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
-                      <ImageIcon className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Brand Image</p>
-                        <p className="text-slate-900">{selectedBrand.image ? "Available" : "No image"}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Brand Image Section */}
-                {selectedBrand.image && (
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-slate-900">Brand Image</h4>
-                    <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                      <div className="flex justify-center">
-                        <div className="w-32 h-32 rounded-lg overflow-hidden bg-white shadow-sm">
-                          <Image
-                            src={getBrandImage(selectedBrand.image) || "/placeholder.svg"}
-                            alt={selectedBrand.name}
-                            width={128}
-                            height={128}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=128&width=128"
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 text-center mt-2">Image path: {selectedBrand.image}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Additional Info */}
-                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <h4 className="font-medium text-purple-900 mb-2">Brand Information</h4>
-                  <div className="grid gap-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-purple-700">Brand ID:</span>
-                      <span className="text-purple-900 font-medium">#{selectedBrand.id}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-purple-700">Has Image:</span>
-                      <span className="text-purple-900 font-medium">{selectedBrand.image ? "Yes" : "No"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-purple-700">Has Note:</span>
-                      <span className="text-purple-900 font-medium">{selectedBrand.note ? "Yes" : "No"}</span>
-                    </div>
-                  </div>
-                </div>
+            {isLoadingDetail ? (
+              <div className="py-8 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400"></div>
+                <span className="ml-2 text-slate-600">Loading project details...</span>
               </div>
+            ) : detailError ? (
+              <Alert className="border-red-200 bg-red-50">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription className="text-red-800">
+                  <div className="space-y-2">
+                    <div className="font-medium">Error loading project details:</div>
+                    <div className="text-sm">{detailError}</div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedProject) {
+                          handleViewDetail(selectedProject)
+                        }
+                      }}
+                      className="mt-2"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              selectedProject && (
+                <div className="space-y-6">
+                  {/* Header Info */}
+                  <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center">
+                      {selectedProject.file ? (
+                        <Image
+                          src={getProjectFileUrl(selectedProject.file) || "/placeholder.svg"}
+                          alt={selectedProject.name}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=64&width=64"
+                          }}
+                        />
+                      ) : (
+                        <FolderOpen className="w-8 h-8 text-slate-600" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-slate-900">{selectedProject.name}</h3>
+                      <p className="text-slate-600">{selectedProject.description || "No description"}</p>
+                      {selectedProject.note && (
+                        <Badge variant="outline" className="mt-2">
+                          {selectedProject.note}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detailed Information */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <FolderOpen className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Project Name</p>
+                          <p className="text-slate-900">{selectedProject.name}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <FileText className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Description</p>
+                          <p className="text-slate-900">{selectedProject.description || "No description"}</p>
+                        </div>
+                      </div>
+
+                      {selectedProject.note && (
+                        <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                          <FileText className="w-5 h-5 text-purple-600" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Note</p>
+                            <p className="text-slate-900">{selectedProject.note}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <Calendar className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Created At</p>
+                          <p className="text-slate-900">{formatDateTime(selectedProject.created_at)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <Calendar className="w-5 h-5 text-slate-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Updated At</p>
+                          <p className="text-slate-900">{formatDateTime(selectedProject.updated_at)}</p>
+                        </div>
+                      </div>
+
+                      {selectedProject.designer && (
+                        <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                          <FolderOpen className="w-5 h-5 text-indigo-600" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Designer</p>
+                            <p className="text-slate-900">{selectedProject.designer}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <ImageIcon className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Project Files</p>
+                          <p className="text-slate-900">
+                            {
+                              [
+                                selectedProject.file,
+                                selectedProject.file2,
+                                selectedProject.file3,
+                                selectedProject.file4,
+                                selectedProject.file5,
+                              ].filter((f) => f).length
+                            }{" "}
+                            files
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Files Section */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-slate-900">Project Files</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      {[
+                        selectedProject.file,
+                        selectedProject.file2,
+                        selectedProject.file3,
+                        selectedProject.file4,
+                        selectedProject.file5,
+                      ].map(
+                        (file, index) =>
+                          file && (
+                            <div key={index} className="border border-slate-200 rounded-lg p-2 bg-slate-50">
+                              <div className="flex justify-center mb-2">
+                                <div className="w-24 h-24 rounded-lg overflow-hidden bg-white shadow-sm">
+                                  {file.match(/\.(jpeg|jpg|gif|png|svg)$/i) ? (
+                                    <Image
+                                      src={getProjectFileUrl(file) || "/placeholder.svg"}
+                                      alt={`Project file ${index + 1}`}
+                                      width={96}
+                                      height={96}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.src = "/placeholder.svg?height=96&width=96"
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center w-full h-full bg-slate-100 text-slate-500">
+                                      <FileText className="h-8 w-8" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-500 text-center truncate">File {index + 1}</p>
+                            </div>
+                          ),
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional Info */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-900 mb-2">Project Information</h4>
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-blue-700">Project ID:</span>
+                        <span className="text-blue-900 font-medium">#{selectedProject.id}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-blue-700">Project Type:</span>
+                        <span className="text-blue-900 font-medium">
+                          {PROJECT_TYPES.find((type) => type.value === selectedProject.type)?.label ||
+                            selectedProject.type}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-blue-700">Brand ID:</span>
+                        <span className="text-blue-900 font-medium">{selectedProject.brand_id}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)} disabled={isLoadingDetail}>
               Close
             </Button>
           </DialogFooter>
@@ -1310,9 +1829,11 @@ export default function BrandPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2 text-red-600">
               <Trash2 className="w-5 h-5" />
-              <span>Delete Brand</span>
+              <span>Delete Project</span>
             </DialogTitle>
-            <DialogDescription>This action cannot be undone. This will permanently delete the brand.</DialogDescription>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the project.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
@@ -1330,14 +1851,14 @@ export default function BrandPage() {
               </Alert>
             )}
 
-            {brandToDelete && (
+            {projectToDelete && (
               <div className="space-y-4">
                 <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg bg-slate-50">
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-200 flex items-center justify-center">
-                    {brandToDelete.image ? (
+                    {projectToDelete.file ? (
                       <Image
-                        src={getBrandImage(brandToDelete.image) || "/placeholder.svg"}
-                        alt={brandToDelete.name}
+                        src={getProjectFileUrl(projectToDelete.file) || "/placeholder.svg"}
+                        alt={projectToDelete.name}
                         width={48}
                         height={48}
                         className="w-full h-full object-cover"
@@ -1347,13 +1868,13 @@ export default function BrandPage() {
                         }}
                       />
                     ) : (
-                      <Award className="w-6 h-6 text-slate-400" />
+                      <FolderOpen className="w-6 h-6 text-slate-400" />
                     )}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-slate-900">{brandToDelete.name}</p>
-                    <p className="text-sm text-slate-600">{brandToDelete.description}</p>
-                    <p className="text-xs text-slate-500">ID: {brandToDelete.id}</p>
+                    <p className="font-medium text-slate-900">{projectToDelete.name}</p>
+                    <p className="text-sm text-slate-600">{projectToDelete.description}</p>
+                    <p className="text-xs text-slate-500">ID: {projectToDelete.id}</p>
                   </div>
                 </div>
 
@@ -1361,8 +1882,10 @@ export default function BrandPage() {
                   <div className="flex items-start space-x-2">
                     <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-red-800">
-                      <p className="font-medium">Are you sure you want to delete this brand?</p>
-                      <p className="mt-1">Brand "{brandToDelete.name}" will be permanently removed from the system.</p>
+                      <p className="font-medium">Are you sure you want to delete this project?</p>
+                      <p className="mt-1">
+                        Project "{projectToDelete.name}" will be permanently removed from the system.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1371,16 +1894,16 @@ export default function BrandPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleDeleteDialogClose} disabled={isDeletingBrand}>
+            <Button variant="outline" onClick={handleDeleteDialogClose} disabled={isDeletingProject}>
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={deleteBrand}
-              disabled={isDeletingBrand}
+              onClick={deleteProject}
+              disabled={isDeletingProject}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isDeletingBrand ? "Deleting..." : "Delete Brand"}
+              {isDeletingProject ? "Deleting..." : "Delete Project"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1388,19 +1911,19 @@ export default function BrandPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogClose}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Brand</DialogTitle>
-            <DialogDescription>Update brand information</DialogDescription>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>Update project information</DialogDescription>
           </DialogHeader>
 
           {isLoadingEditData ? (
             <div className="py-8 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400"></div>
-              <span className="ml-2 text-slate-600">Loading brand data...</span>
+              <span className="ml-2 text-slate-600">Loading project data...</span>
             </div>
           ) : (
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
               {editMessage && (
                 <Alert
                   className={
@@ -1416,107 +1939,24 @@ export default function BrandPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-name">Brand Name *</Label>
+                <Label htmlFor="edit-name">Project Name *</Label>
                 <Input
                   id="edit-name"
-                  value={editBrand.name}
-                  onChange={(e) => setEditBrand({ ...editBrand, name: e.target.value })}
-                  placeholder="Enter brand name"
-                  disabled={isEditingBrand}
+                  value={editProjectData.name}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, name: e.target.value })}
+                  placeholder="Enter project name"
+                  disabled={isEditingProject}
                 />
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-image">Brand Image</Label>
-                <div className="space-y-3">
-                  <Input
-                    id="edit-image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleEditImageChange}
-                    disabled={isEditingBrand}
-                    className="cursor-pointer"
-                  />
-
-                  {/* Image Preview Section */}
-                  <div className="space-y-2">
-                    {editImagePreview ? (
-                      // New image selected
-                      <div className="relative">
-                        <div className="w-full h-40 rounded-lg overflow-hidden border-2 border-dashed border-blue-300 bg-blue-50">
-                          <Image
-                            src={editImagePreview || "/placeholder.svg"}
-                            alt="New brand image preview"
-                            fill
-                            className="object-contain p-2"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-md"
-                          onClick={() => {
-                            setEditBrandImage(null)
-                            setEditImagePreview(null)
-                          }}
-                          disabled={isEditingBrand}
-                        >
-                          <X className="h-4 w-4" />
-                          <span className="sr-only">Remove new image</span>
-                        </Button>
-                        <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                          New Image
-                        </div>
-                      </div>
-                    ) : currentBrandImage ? (
-                      // Current existing image
-                      <div className="relative">
-                        <div className="w-full h-40 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                          <Image
-                            src={getBrandImage(currentBrandImage) || "/placeholder.svg"}
-                            alt="Current brand image"
-                            fill
-                            className="object-contain p-2"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=160&width=320"
-                            }}
-                          />
-                        </div>
-                        <div className="absolute bottom-2 left-2 bg-slate-600 text-white text-xs px-2 py-1 rounded">
-                          Current Image
-                        </div>
-                      </div>
-                    ) : (
-                      // No image placeholder
-                      <div className="w-full h-40 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center">
-                        <div className="text-center">
-                          <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-                          <p className="text-sm text-slate-500">No image uploaded</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-slate-500">
-                      {editImagePreview
-                        ? "New image selected - will replace current image when saved"
-                        : currentBrandImage
-                        ? "Current brand image - upload a new file to replace"
-                        : "Upload a brand logo or image (optional)"
-                      }
-                    </p>
-                  </div>
-                </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="edit-description">Description *</Label>
                 <Textarea
                   id="edit-description"
-                  value={editBrand.description}
-                  onChange={(e) => setEditBrand({ ...editBrand, description: e.target.value })}
-                  placeholder="Enter brand description"
-                  disabled={isEditingBrand}
+                  value={editProjectData.description}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, description: e.target.value })}
+                  placeholder="Enter project description"
+                  disabled={isEditingProject}
                   rows={3}
                 />
               </div>
@@ -1525,26 +1965,200 @@ export default function BrandPage() {
                 <Label htmlFor="edit-note">Note</Label>
                 <Textarea
                   id="edit-note"
-                  value={editBrand.note}
-                  onChange={(e) => setEditBrand({ ...editBrand, note: e.target.value })}
+                  value={editProjectData.note}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, note: e.target.value })}
                   placeholder="Enter additional notes (optional)"
-                  disabled={isEditingBrand}
+                  disabled={isEditingProject}
                   rows={2}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-type">Type *</Label>
+                <Select
+                  value={editProjectData.type}
+                  onValueChange={(value: "image/video" | "text" | "mixed" | "web" | "mobile") =>
+                    setEditProjectData({ ...editProjectData, type: value })
+                  }
+                  disabled={isEditingProject}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex items-center gap-2">
+                          <type.icon className="h-4 w-4" /> {type.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-brand_id">Brand ID *</Label>
+                <Input
+                  id="edit-brand_id"
+                  value={editProjectData.brand_id}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, brand_id: e.target.value })}
+                  placeholder="Enter brand ID"
+                  disabled={isEditingProject}
+                />
+              </div>
+
+              {/* Tambahkan Designer field di sini */}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-designer">Designer</Label>
+                <Input
+                  id="edit-designer"
+                  value={editProjectData.designer}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, designer: e.target.value })}
+                  placeholder="Enter designer name (optional)"
+                  disabled={isEditingProject}
+                />
+              </div>
+
+              <div className="grid gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-4">Project Files</h3>
+                  <div className="space-y-4">
+                    {/* File 1 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-file">Project File 1</Label>
+                      <Input
+                        id="edit-file"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleEditFileChange(e, 1)}
+                        disabled={isEditingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={1}
+                        filePreview={editFilePreview}
+                        currentFile={currentProjectFile}
+                        onFileChange={(e) => handleEditFileChange(e, 1)}
+                        onRemove={() => {
+                          setEditProjectFile(null)
+                          setEditFilePreview(null)
+                        }}
+                        isLoading={isEditingProject}
+                      />
+                    </div>
+
+                    {/* File 2 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-file2">Project File 2</Label>
+                      <Input
+                        id="edit-file2"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleEditFileChange(e, 2)}
+                        disabled={isEditingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={2}
+                        filePreview={editFilePreview2}
+                        currentFile={currentProjectFile2}
+                        onFileChange={(e) => handleEditFileChange(e, 2)}
+                        onRemove={() => {
+                          setEditProjectFile2(null)
+                          setEditFilePreview2(null)
+                        }}
+                        isLoading={isEditingProject}
+                      />
+                    </div>
+
+                    {/* File 3 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-file3">Project File 3</Label>
+                      <Input
+                        id="edit-file3"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleEditFileChange(e, 3)}
+                        disabled={isEditingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={3}
+                        filePreview={editFilePreview3}
+                        currentFile={currentProjectFile3}
+                        onFileChange={(e) => handleEditFileChange(e, 3)}
+                        onRemove={() => {
+                          setEditProjectFile3(null)
+                          setEditFilePreview3(null)
+                        }}
+                        isLoading={isEditingProject}
+                      />
+                    </div>
+
+                    {/* File 4 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-file4">Project File 4</Label>
+                      <Input
+                        id="edit-file4"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleEditFileChange(e, 4)}
+                        disabled={isEditingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={4}
+                        filePreview={editFilePreview4}
+                        currentFile={currentProjectFile4}
+                        onFileChange={(e) => handleEditFileChange(e, 4)}
+                        onRemove={() => {
+                          setEditProjectFile4(null)
+                          setEditFilePreview4(null)
+                        }}
+                        isLoading={isEditingProject}
+                      />
+                    </div>
+
+                    {/* File 5 */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-file5">Project File 5</Label>
+                      <Input
+                        id="edit-file5"
+                        type="file"
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={(e) => handleEditFileChange(e, 5)}
+                        disabled={isEditingProject}
+                        className="cursor-pointer"
+                      />
+                      <FilePreviewSection
+                        fileNumber={5}
+                        filePreview={editFilePreview5}
+                        currentFile={currentProjectFile5}
+                        onFileChange={(e) => handleEditFileChange(e, 5)}
+                        onRemove={() => {
+                          setEditProjectFile5(null)
+                          setEditFilePreview5(null)
+                        }}
+                        isLoading={isEditingProject}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleEditDialogClose} disabled={isEditingBrand || isLoadingEditData}>
+            <Button variant="outline" onClick={handleEditDialogClose} disabled={isEditingProject || isLoadingEditData}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateBrand} disabled={isEditingBrand || isLoadingEditData}>
-              {isEditingBrand ? "Updating..." : "Update Brand"}
+            <Button onClick={handleUpdateProject} disabled={isEditingProject || isLoadingEditData}>
+              {isEditingProject ? "Updating..." : "Update Project"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )\
+  )
 }
