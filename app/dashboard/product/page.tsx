@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Search,
@@ -19,6 +19,7 @@ import {
   Calendar,
   Clock,
   FileText,
+  Factory,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,12 +37,21 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+// Define API base URL using environment variables
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/admins`
+  : "http://127.0.0.1:8000/api/admins"
+const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_URL
+  ? process.env.NEXT_PUBLIC_STORAGE_URL
+  : "http://127.0.0.1:8000/storage/"
+
 interface Product {
   id: number
   name: string
   description: string
   category: string | null
   brand: string
+  made_id: number | null
   image1: string | null
   image2: string | null
   image3: string | null
@@ -50,6 +60,12 @@ interface Product {
   image6: string | null
   created_at?: string
   updated_at?: string
+}
+
+interface Material {
+  id: number
+  name: string
+  file: string | null
 }
 
 interface Meta {
@@ -99,6 +115,8 @@ export default function ProductPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [imageZoomOpen, setImageZoomOpen] = useState(false)
 
@@ -106,6 +124,8 @@ export default function ProductPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(false)
   const [brands, setBrands] = useState<{ id: number; name: string }[]>([])
   const [brandsLoading, setBrandsLoading] = useState(false)
+  const [materials, setMaterials] = useState<Material[]>([])
+  const [materialsLoading, setMaterialsLoading] = useState(false)
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
@@ -116,6 +136,7 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
+    made_id: "",
   })
   const [imageFiles, setImageFiles] = useState<{
     image1: File | null
@@ -157,6 +178,7 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
+    made_id: "",
   })
   const [editImageFiles, setEditImageFiles] = useState<{
     image1: File | null
@@ -189,6 +211,20 @@ export default function ProductPage() {
     image6: null,
   })
 
+  // Helper to get image URL
+  const getImageUrl = useCallback(
+    (filePath: string | null): string => {
+      if (!filePath) {
+        return "/placeholder.svg?height=100&width=100"
+      }
+      if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+        return filePath
+      }
+      return `${STORAGE_BASE_URL}${filePath}`
+    },
+    [STORAGE_BASE_URL],
+  )
+
   // Fetch products
   const fetchProducts = async (page = 1, name = "", category = "", brand = "") => {
     setLoading(true)
@@ -197,11 +233,13 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setError("Authentication required. Please login.")
+        setLoading(false)
+        setIsSearching(false)
         return
       }
 
-      let url = `${process.env.NEXT_PUBLIC_API_URL}/admins/product?page=${page}`
+      let url = `${API_BASE_URL}/product?page=${page}`
       if (name) url += `&name=${encodeURIComponent(name)}`
       if (category) url += `&category=${encodeURIComponent(category)}`
       if (brand) url += `&brand=${encodeURIComponent(brand)}`
@@ -213,12 +251,6 @@ export default function ProductPage() {
         },
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
       const data: ProductResponse = await response.json()
 
       if (data.success) {
@@ -227,7 +259,7 @@ export default function ProductPage() {
         setTotalPages(data.data.meta.last_page)
         setTotalProducts(data.data.meta.total)
       } else {
-        setError(data.message)
+        setError(data.message || "Failed to fetch products")
         setProducts([])
       }
     } catch (err) {
@@ -268,17 +300,23 @@ export default function ProductPage() {
   // View product details
   const viewProductDetails = async (product: Product) => {
     setSelectedProduct(null)
+    setDetailError(null)
     setDetailDialogOpen(true)
-    setLoading(true)
+    setDetailLoading(true)
 
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setDetailError("Authentication required. Please login.")
+        setDetailLoading(false)
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${product.id}`, {
+      const url = `${API_BASE_URL}/product/${product.id}`
+      console.log("Fetching product details from:", url)
+      console.log("Token:", token ? "Present" : "Missing")
+
+      const response = await fetch(url, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -286,23 +324,29 @@ export default function ProductPage() {
         },
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
+      console.log("Response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.log("Error response:", errorData)
+        setDetailError(errorData.message || `Failed to load product details (${response.status})`)
+        setDetailLoading(false)
         return
       }
 
       const data = await response.json()
+      console.log("Success response:", data)
 
-      if (data.success) {
+      if (data.success && data.data && data.data.general) {
         setSelectedProduct(data.data.general)
       } else {
-        setError(data.message)
+        setDetailError(data.message || "Failed to load product details")
       }
     } catch (err) {
-      setError("Failed to fetch product details. Please try again.")
+      console.error("Error fetching product details:", err)
+      setDetailError("Failed to fetch product details. Please try again.")
     } finally {
-      setLoading(false)
+      setDetailLoading(false)
     }
   }
 
@@ -318,7 +362,15 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setCreateLoading(false)
         return
       }
 
@@ -329,8 +381,8 @@ export default function ProductPage() {
       formDataToSend.append("description", formData.description)
       formDataToSend.append("stock_type", formData.stock_type)
       formDataToSend.append("color", formData.color)
+      formDataToSend.append("made_id", formData.made_id)
 
-      // Add images (image1 is required, others are nullable)
       if (imageFiles.image1) {
         formDataToSend.append("image1", imageFiles.image1)
       }
@@ -350,7 +402,7 @@ export default function ProductPage() {
         formDataToSend.append("image6", imageFiles.image6)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product`, {
+      const response = await fetch(`${API_BASE_URL}/product`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -358,28 +410,19 @@ export default function ProductPage() {
         body: formDataToSend,
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
       const data = await response.json()
 
       if (data.success) {
         setCreateDialogOpen(false)
-        // Show success notification
         setNotification({
           show: true,
           message: "Product created successfully!",
           type: "success",
         })
-        // Hide notification after 3 seconds
         setTimeout(() => {
           setNotification((prev) => ({ ...prev, show: false }))
         }, 3000)
 
-        // Reset form
         setFormData({
           name: "",
           brand_id: "",
@@ -387,6 +430,7 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
+          made_id: "",
         })
         setImageFiles({
           image1: null,
@@ -396,7 +440,6 @@ export default function ProductPage() {
           image5: null,
           image6: null,
         })
-        // Refresh products list
         fetchProducts(currentPage)
       } else {
         setNotification({
@@ -431,11 +474,19 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setDeleteLoading(false)
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${productToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/product/${productToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -443,29 +494,20 @@ export default function ProductPage() {
         },
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
       const data = await response.json()
 
       if (data.success) {
         setDeleteDialogOpen(false)
         setProductToDelete(null)
-        // Show success notification
         setNotification({
           show: true,
           message: "Product deleted successfully!",
           type: "success",
         })
-        // Hide notification after 3 seconds
         setTimeout(() => {
           setNotification((prev) => ({ ...prev, show: false }))
         }, 3000)
 
-        // Refresh products list
         fetchProducts(currentPage)
       } else {
         setNotification({
@@ -517,23 +559,25 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setCategoriesLoading(false)
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-category`, {
+      const response = await fetch(`${API_BASE_URL}/get-category`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       })
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
 
       const data = await response.json()
 
@@ -570,23 +614,25 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setBrandsLoading(false)
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-brand`, {
+      const response = await fetch(`${API_BASE_URL}/get-brand`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       })
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
 
       const data = await response.json()
 
@@ -616,12 +662,68 @@ export default function ProductPage() {
     }
   }
 
+  // Fetch materials
+  const fetchMaterials = async () => {
+    setMaterialsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setMaterialsLoading(false)
+        return
+      }
+
+      const response = await fetch(`${API_BASE_URL}/get-material`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setMaterials(data.data)
+      } else {
+        setNotification({
+          show: true,
+          message: data.message || "Failed to fetch materials",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+      }
+    } catch (err) {
+      setNotification({
+        show: true,
+        message: "Failed to fetch materials. Please try again.",
+        type: "error",
+      })
+      setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }))
+      }, 3000)
+    } finally {
+      setMaterialsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    if (createDialogOpen) {
+    if (createDialogOpen || editDialogOpen) {
       fetchCategories()
       fetchBrands()
+      fetchMaterials()
     }
-  }, [createDialogOpen])
+  }, [createDialogOpen, editDialogOpen])
 
   // Edit product functions
   const handleEditClick = async (product: Product) => {
@@ -631,23 +733,26 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setEditDialogOpen(false)
+        setEditLoading(false)
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/edit-product/${product.id}`, {
+      const response = await fetch(`${API_BASE_URL}/edit-product/${product.id}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       })
-
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
 
       const data = await response.json()
 
@@ -661,6 +766,7 @@ export default function ProductPage() {
           description: productData.description,
           stock_type: productData.stock_type,
           color: productData.color,
+          made_id: productData.made_id ? productData.made_id.toString() : "",
         })
         setExistingImages({
           image1: productData.image1,
@@ -670,9 +776,9 @@ export default function ProductPage() {
           image5: productData.image5,
           image6: productData.image6,
         })
-        // Fetch categories and brands for edit modal
         fetchCategories()
         fetchBrands()
+        fetchMaterials()
       } else {
         setNotification({
           show: true,
@@ -715,7 +821,6 @@ export default function ProductPage() {
 
   // Update product
   const updateProduct = async () => {
-    // Validate required fields
     if (!editFormData.name.trim()) {
       setNotification({
         show: true,
@@ -793,7 +898,15 @@ export default function ProductPage() {
     try {
       const token = localStorage.getItem("token")
       if (!token) {
-        router.push("/login")
+        setNotification({
+          show: true,
+          message: "Authentication required. Please login.",
+          type: "error",
+        })
+        setTimeout(() => {
+          setNotification((prev) => ({ ...prev, show: false }))
+        }, 3000)
+        setEditLoading(false)
         return
       }
 
@@ -805,8 +918,8 @@ export default function ProductPage() {
       formDataToSend.append("description", editFormData.description)
       formDataToSend.append("stock_type", editFormData.stock_type)
       formDataToSend.append("color", editFormData.color)
+      formDataToSend.append("made_id", editFormData.made_id)
 
-      // Add all image fields - send new files if selected, otherwise send empty
       if (editImageFiles.image1) {
         formDataToSend.append("image1", editImageFiles.image1)
       }
@@ -826,7 +939,7 @@ export default function ProductPage() {
         formDataToSend.append("image6", editImageFiles.image6)
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/product/${editFormData.id}`, {
+      const response = await fetch(`${API_BASE_URL}/product/${editFormData.id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -834,28 +947,19 @@ export default function ProductPage() {
         body: formDataToSend,
       })
 
-      if (response.status === 401) {
-        localStorage.removeItem("token")
-        router.push("/login")
-        return
-      }
-
       const data = await response.json()
 
       if (data.success) {
         setEditDialogOpen(false)
-        // Show success notification
         setNotification({
           show: true,
           message: "Product updated successfully!",
           type: "success",
         })
-        // Hide notification after 3 seconds
         setTimeout(() => {
           setNotification((prev) => ({ ...prev, show: false }))
         }, 3000)
 
-        // Reset form
         setEditFormData({
           id: 0,
           name: "",
@@ -864,6 +968,7 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
+          made_id: "",
         })
         setEditImageFiles({
           image1: null,
@@ -881,10 +986,8 @@ export default function ProductPage() {
           image5: null,
           image6: null,
         })
-        // Refresh products list
         fetchProducts(currentPage)
       } else {
-        // Show error notification with server message
         setNotification({
           show: true,
           message: data.message || "Failed to update product. Please try again.",
@@ -906,6 +1009,13 @@ export default function ProductPage() {
     } finally {
       setEditLoading(false)
     }
+  }
+
+  // Helper to get material name by ID
+  const getMaterialName = (id: number | null) => {
+    if (id === null) return "None"
+    const material = materials.find((m) => m.id === id)
+    return material ? material.name : "Unknown"
   }
 
   return (
@@ -1106,7 +1216,7 @@ export default function ProductPage() {
                           {product.image1 ? (
                             <div className="w-10 h-10 rounded overflow-hidden bg-slate-100">
                               <img
-                                src={product.image1 || "/placeholder.svg"}
+                                src={getImageUrl(product.image1) || "/placeholder.svg"}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
@@ -1230,10 +1340,20 @@ export default function ProductPage() {
             <DialogDescription>Detailed information about the selected product.</DialogDescription>
           </DialogHeader>
 
-          {loading ? (
+          {detailLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
               <p className="text-sm text-muted-foreground ml-2">Loading product details...</p>
+            </div>
+          ) : detailError ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-4">
+              <div className="text-center">
+                <p className="text-red-600 font-medium">{detailError}</p>
+              </div>
+              <Button onClick={() => viewProductDetails(selectedProduct || products[0])}>
+                <Loader2 className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
             </div>
           ) : selectedProduct ? (
             <div className="space-y-4">
@@ -1257,7 +1377,7 @@ export default function ProductPage() {
                         className="w-full h-full focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                       >
                         <img
-                          src={image || "/placeholder.svg"}
+                          src={getImageUrl(image) || "/placeholder.svg"}
                           alt={`${selectedProduct.name} - Image ${index + 1}`}
                           className="w-full h-full object-cover hover:opacity-80 transition-opacity cursor-pointer"
                           onError={(e) => {
@@ -1299,7 +1419,7 @@ export default function ProductPage() {
                   </div>
                 </div>
 
-                {/* Row 2: Brand and Created At */}
+                {/* Row 2: Brand and Made By */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex items-center justify-center w-8 h-8 bg-green-100 rounded-full">
@@ -1312,6 +1432,19 @@ export default function ProductPage() {
                   </div>
 
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-center w-8 h-8 bg-yellow-100 rounded-full">
+                      <Factory className="h-4 w-4 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground">Made By</p>
+                      <p className="font-medium">{getMaterialName(selectedProduct.made_id)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: Created At and Updated At */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex items-center justify-center w-8 h-8 bg-orange-100 rounded-full">
                       <Calendar className="h-4 w-4 text-orange-600" />
                     </div>
@@ -1322,10 +1455,6 @@ export default function ProductPage() {
                       </p>
                     </div>
                   </div>
-                </div>
-
-                {/* Row 3: Updated At (single field) */}
-                <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                     <div className="flex items-center justify-center w-8 h-8 bg-red-100 rounded-full">
                       <Clock className="h-4 w-4 text-red-600" />
@@ -1337,7 +1466,6 @@ export default function ProductPage() {
                       </p>
                     </div>
                   </div>
-                  <div></div> {/* Empty space for alignment */}
                 </div>
 
                 {/* Row 4: Description (full width) */}
@@ -1376,14 +1504,16 @@ export default function ProductPage() {
             <div className="flex justify-center">
               <img
                 src={
-                  [
-                    selectedProduct.image1,
-                    selectedProduct.image2,
-                    selectedProduct.image3,
-                    selectedProduct.image4,
-                    selectedProduct.image5,
-                    selectedProduct.image6,
-                  ][selectedImageIndex] || "/placeholder.svg"
+                  getImageUrl(
+                    [
+                      selectedProduct.image1,
+                      selectedProduct.image2,
+                      selectedProduct.image3,
+                      selectedProduct.image4,
+                      selectedProduct.image5,
+                      selectedProduct.image6,
+                    ][selectedImageIndex],
+                  ) || "/placeholder.svg"
                 }
                 alt={`${selectedProduct.name} - Image ${selectedImageIndex + 1}`}
                 className="max-w-full max-h-[70vh] object-contain rounded"
@@ -1489,7 +1619,30 @@ export default function ProductPage() {
                   placeholder="Enter color"
                 />
               </div>
-              <div></div>
+              <div>
+                <label className="text-sm font-medium">Made By</label>
+                <Select value={formData.made_id} onValueChange={(value) => handleInputChange("made_id", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={materialsLoading ? "Loading materials..." : "Select material"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materialsLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading...</span>
+                      </div>
+                    ) : materials.length > 0 ? (
+                      materials.map((material) => (
+                        <SelectItem key={material.id} value={material.id.toString()}>
+                          {material.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-3 text-sm text-muted-foreground">No materials available</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
@@ -1697,7 +1850,33 @@ export default function ProductPage() {
                     placeholder="Enter color"
                   />
                 </div>
-                <div></div>
+                <div>
+                  <label className="text-sm font-medium">Made By</label>
+                  <Select
+                    value={editFormData.made_id}
+                    onValueChange={(value) => handleEditInputChange("made_id", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={materialsLoading ? "Loading materials..." : "Select material"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materialsLoading ? (
+                        <div className="flex items-center justify-center py-2">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm">Loading...</span>
+                        </div>
+                      ) : materials.length > 0 ? (
+                        materials.map((material) => (
+                          <SelectItem key={material.id} value={material.id.toString()}>
+                            {material.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="py-2 px-3 text-sm text-muted-foreground">No materials available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
@@ -1722,7 +1901,7 @@ export default function ProductPage() {
                     {existingImages.image1 && !editImageFiles.image1 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image1 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image1) || "/placeholder.svg"}
                           alt="Current Image 1"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1747,7 +1926,7 @@ export default function ProductPage() {
                     {existingImages.image2 && !editImageFiles.image2 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image2 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image2) || "/placeholder.svg"}
                           alt="Current Image 2"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1775,7 +1954,7 @@ export default function ProductPage() {
                     {existingImages.image3 && !editImageFiles.image3 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image3 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image3) || "/placeholder.svg"}
                           alt="Current Image 3"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1800,7 +1979,7 @@ export default function ProductPage() {
                     {existingImages.image4 && !editImageFiles.image4 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image4 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image4) || "/placeholder.svg"}
                           alt="Current Image 4"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1828,7 +2007,7 @@ export default function ProductPage() {
                     {existingImages.image5 && !editImageFiles.image5 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image5 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image5) || "/placeholder.svg"}
                           alt="Current Image 5"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1853,7 +2032,7 @@ export default function ProductPage() {
                     {existingImages.image6 && !editImageFiles.image6 && (
                       <div className="mb-2">
                         <img
-                          src={existingImages.image6 || "/placeholder.svg"}
+                          src={getImageUrl(existingImages.image6) || "/placeholder.svg"}
                           alt="Current Image 6"
                           className="w-20 h-20 object-cover rounded border"
                           onError={(e) => {
@@ -1912,7 +2091,7 @@ export default function ProductPage() {
                 <div className="w-10 h-10 rounded overflow-hidden bg-slate-100 flex-shrink-0">
                   {productToDelete.image1 ? (
                     <img
-                      src={productToDelete.image1 || "/placeholder.svg"}
+                      src={getImageUrl(productToDelete.image1) || "/placeholder.svg"}
                       alt={productToDelete.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {

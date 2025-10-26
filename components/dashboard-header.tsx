@@ -61,7 +61,8 @@ export function DashboardHeader() {
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={handleAccountInfo}>
                 <User className="mr-2 h-4 w-4" />
-                <span>Account Information</span>
+                <span>Account Information
+                </span>
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
