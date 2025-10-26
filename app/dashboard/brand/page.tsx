@@ -170,6 +170,7 @@ export default function BrandPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        console.error("[v0] No authentication token found in fetchBrands")
         setApiError("No authentication token found. Please login.")
         setIsLoading(false)
         setIsSearching(false)
@@ -199,11 +200,12 @@ export default function BrandPage() {
 
       console.log("Response status:", response.status)
 
-      // Only redirect to login if we get a 401 Unauthorized
       if (response.status === 401) {
-        console.log("Unauthorized access, redirecting to login")
+        console.error("[v0] 401 Unauthorized in fetchBrands - Token may be expired")
+        setApiError("Authentication failed (401 Unauthorized). Your session may have expired.")
         localStorage.removeItem("token")
-        router.push("/login")
+        // Optional: Uncomment to redirect after 3 seconds
+        // setTimeout(() => router.push("/login"), 3000)
         return
       }
 
@@ -405,8 +407,8 @@ export default function BrandPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        console.error("[v0] No authentication token found in createBrand")
         setCreateMessage("Authentication token not found. Please login again.")
-        router.push("/login")
         return
       }
 
@@ -439,9 +441,9 @@ export default function BrandPage() {
       const data = await response.json()
 
       if (response.status === 401) {
-        setCreateMessage("Authentication failed. Please login again.")
+        console.error("[v0] 401 Unauthorized in createBrand - Token may be expired")
+        setCreateMessage("Authentication failed (401 Unauthorized). Please login again.")
         localStorage.removeItem("token")
-        router.push("/login")
         return
       }
 
@@ -502,8 +504,8 @@ export default function BrandPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        console.error("[v0] No authentication token found in deleteBrand")
         setDeleteMessage("Authentication token not found. Please login again.")
-        router.push("/login")
         return
       }
 
@@ -521,9 +523,9 @@ export default function BrandPage() {
       const data = await response.json()
 
       if (response.status === 401) {
-        setDeleteMessage("Authentication failed. Please login again.")
+        console.error("[v0] 401 Unauthorized in deleteBrand - Token may be expired")
+        setDeleteMessage("Authentication failed (401 Unauthorized). Please login again.")
         localStorage.removeItem("token")
-        router.push("/login")
         return
       }
 
@@ -571,8 +573,8 @@ export default function BrandPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        console.error("[v0] No authentication token found in handleEditBrand")
         setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
         return
       }
 
@@ -587,9 +589,9 @@ export default function BrandPage() {
       const data = await response.json()
 
       if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
+        console.error("[v0] 401 Unauthorized in handleEditBrand - Token may be expired")
+        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
         localStorage.removeItem("token")
-        router.push("/login")
         return
       }
 
@@ -656,8 +658,8 @@ export default function BrandPage() {
       const token = localStorage.getItem("token")
 
       if (!token) {
+        console.error("[v0] No authentication token found in updateBrand")
         setEditMessage("Authentication token not found. Please login again.")
-        router.push("/login")
         return
       }
 
@@ -690,9 +692,9 @@ export default function BrandPage() {
       const data = await response.json()
 
       if (response.status === 401) {
-        setEditMessage("Authentication failed. Please login again.")
+        console.error("[v0] 401 Unauthorized in updateBrand - Token may be expired")
+        setEditMessage("Authentication failed (401 Unauthorized). Please login again.")
         localStorage.removeItem("token")
-        router.push("/login")
         return
       }
 
@@ -1497,14 +1499,13 @@ export default function BrandPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     <p className="text-xs text-slate-500">
-                      {editImagePreview 
-                        ? "New image selected - will replace current image when saved" 
-                        : currentBrandImage 
-                        ? "Current brand image - upload a new file to replace" 
-                        : "Upload a brand logo or image (optional)"
-                      }
+                      {editImagePreview
+                        ? "New image selected - will replace current image when saved"
+                        : currentBrandImage
+                          ? "Current brand image - upload a new file to replace"
+                          : "Upload a brand logo or image (optional)"}
                     </p>
                   </div>
                 </div>
