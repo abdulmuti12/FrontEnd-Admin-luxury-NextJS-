@@ -47,6 +47,7 @@ interface BrandData {
   description: string
   created_at: string
   updated_at: string
+  link: string // Added link field
 }
 
 interface BrandDetailData {
@@ -58,6 +59,7 @@ interface BrandDetailData {
     description: string
     created_at: string
     updated_at: string
+    link: string // Added link field
   }
 }
 
@@ -125,6 +127,7 @@ export default function BrandPage() {
     name: "",
     description: "",
     note: "",
+    link: "", // Added link field
   })
   const [brandImage, setBrandImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -143,6 +146,7 @@ export default function BrandPage() {
     name: "",
     description: "",
     note: "",
+    link: "", // Added link field
   })
   const [editBrandImage, setEditBrandImage] = useState<File | null>(null)
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
@@ -394,6 +398,7 @@ export default function BrandPage() {
         name: "",
         description: "",
         note: "",
+        link: "", // Reset link field
       })
       setBrandImage(null)
       setImagePreview(null)
@@ -422,6 +427,10 @@ export default function BrandPage() {
 
       if (newBrand.note) {
         formData.append("note", newBrand.note)
+      }
+
+      if (newBrand.link) {
+        formData.append("link", newBrand.link)
       }
 
       if (brandImage) {
@@ -456,6 +465,7 @@ export default function BrandPage() {
           name: "",
           description: "",
           note: "",
+          link: "", // Reset link field
         })
         setBrandImage(null)
         setImagePreview(null)
@@ -601,6 +611,7 @@ export default function BrandPage() {
           name: data.data.name || "",
           description: data.data.description || "",
           note: data.data.note || "",
+          link: data.data.link || "", // Added link field to editBrand state
         })
         setCurrentBrandImage(data.data.image)
         setEditImagePreview(null)
@@ -643,6 +654,7 @@ export default function BrandPage() {
         name: "",
         description: "",
         note: "",
+        link: "", // Reset link field
       })
       setEditBrandImage(null)
       setEditImagePreview(null)
@@ -674,6 +686,10 @@ export default function BrandPage() {
 
       if (editBrand.note) {
         formData.append("note", editBrand.note)
+      }
+
+      if (editBrand.link) {
+        formData.append("link", editBrand.link)
       }
 
       if (editBrandImage) {
@@ -840,6 +856,19 @@ export default function BrandPage() {
                   placeholder="Enter brand name"
                   disabled={isCreatingBrand}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="link">Brand Link</Label>
+                <Input
+                  id="link"
+                  type="url"
+                  value={newBrand.link}
+                  onChange={(e) => setNewBrand({ ...newBrand, link: e.target.value })}
+                  placeholder="https://example.com"
+                  disabled={isCreatingBrand}
+                />
+                <p className="text-xs text-slate-500">Enter the brand's website URL (optional)</p>
               </div>
 
               <div className="grid gap-2">
@@ -1248,6 +1277,26 @@ export default function BrandPage() {
                         <p className="text-slate-900">{selectedBrand.image ? "Available" : "No image"}</p>
                       </div>
                     </div>
+
+                    {/* Added link detail */}
+                    {selectedBrand.link && (
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                        <Award className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Brand Link</p>
+                          <p className="text-slate-900">
+                            <a
+                              href={selectedBrand.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              {selectedBrand.link}
+                            </a>
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1291,6 +1340,11 @@ export default function BrandPage() {
                     <div className="flex justify-between">
                       <span className="text-purple-700">Has Note:</span>
                       <span className="text-purple-900 font-medium">{selectedBrand.note ? "Yes" : "No"}</span>
+                    </div>
+                    {/* Added link info */}
+                    <div className="flex justify-between">
+                      <span className="text-purple-700">Has Link:</span>
+                      <span className="text-purple-900 font-medium">{selectedBrand.link ? "Yes" : "No"}</span>
                     </div>
                   </div>
                 </div>
@@ -1426,6 +1480,19 @@ export default function BrandPage() {
                   placeholder="Enter brand name"
                   disabled={isEditingBrand}
                 />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-link">Brand Link</Label>
+                <Input
+                  id="edit-link"
+                  type="url"
+                  value={editBrand.link}
+                  onChange={(e) => setEditBrand({ ...editBrand, link: e.target.value })}
+                  placeholder="https://example.com"
+                  disabled={isEditingBrand}
+                />
+                <p className="text-xs text-slate-500">Enter the brand's website URL (optional)</p>
               </div>
 
               <div className="grid gap-2">
