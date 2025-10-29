@@ -60,6 +60,7 @@ interface Product {
   image6: string | null
   created_at?: string
   updated_at?: string
+  size: string | null
 }
 
 interface Material {
@@ -136,6 +137,7 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
+    size: "",
     made_id: "",
   })
   const [imageFiles, setImageFiles] = useState<{
@@ -178,6 +180,7 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
+    size: "",
     made_id: "",
   })
   const [editImageFiles, setEditImageFiles] = useState<{
@@ -381,6 +384,7 @@ export default function ProductPage() {
       formDataToSend.append("description", formData.description)
       formDataToSend.append("stock_type", formData.stock_type)
       formDataToSend.append("color", formData.color)
+      formDataToSend.append("size", formData.size)
       formDataToSend.append("made_id", formData.made_id)
 
       if (imageFiles.image1) {
@@ -430,6 +434,7 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
+          size: "",
           made_id: "",
         })
         setImageFiles({
@@ -766,6 +771,7 @@ export default function ProductPage() {
           description: productData.description,
           stock_type: productData.stock_type,
           color: productData.color,
+          size: productData.size || "",
           made_id: productData.made_id ? productData.made_id.toString() : "",
         })
         setExistingImages({
@@ -918,6 +924,7 @@ export default function ProductPage() {
       formDataToSend.append("description", editFormData.description)
       formDataToSend.append("stock_type", editFormData.stock_type)
       formDataToSend.append("color", editFormData.color)
+      formDataToSend.append("size", editFormData.size)
       formDataToSend.append("made_id", editFormData.made_id)
 
       if (editImageFiles.image1) {
@@ -968,6 +975,7 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
+          size: "",
           made_id: "",
         })
         setEditImageFiles({
@@ -1620,6 +1628,17 @@ export default function ProductPage() {
                 />
               </div>
               <div>
+                <label className="text-sm font-medium">Size</label>
+                <Input
+                  value={formData.size}
+                  onChange={(e) => handleInputChange("size", e.target.value)}
+                  placeholder="e.g., S, M, L, XL or 40x60cm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <label className="text-sm font-medium">Made By</label>
                 <Select value={formData.made_id} onValueChange={(value) => handleInputChange("made_id", value)}>
                   <SelectTrigger>
@@ -1850,6 +1869,17 @@ export default function ProductPage() {
                     placeholder="Enter color"
                   />
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Size</label>
+                  <Input
+                    value={editFormData.size}
+                    onChange={(e) => handleEditInputChange("size", e.target.value)}
+                    placeholder="e.g., S, M, L, XL or 40x60cm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Made By</label>
                   <Select
