@@ -60,7 +60,6 @@ interface Product {
   image6: string | null
   created_at?: string
   updated_at?: string
-  size: string | null
 }
 
 interface Material {
@@ -137,7 +136,6 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
-    size: "",
     made_id: "",
   })
   const [imageFiles, setImageFiles] = useState<{
@@ -180,7 +178,6 @@ export default function ProductPage() {
     description: "",
     stock_type: "",
     color: "",
-    size: "",
     made_id: "",
   })
   const [editImageFiles, setEditImageFiles] = useState<{
@@ -384,7 +381,6 @@ export default function ProductPage() {
       formDataToSend.append("description", formData.description)
       formDataToSend.append("stock_type", formData.stock_type)
       formDataToSend.append("color", formData.color)
-      formDataToSend.append("size", formData.size)
       formDataToSend.append("made_id", formData.made_id)
 
       if (imageFiles.image1) {
@@ -434,7 +430,6 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
-          size: "",
           made_id: "",
         })
         setImageFiles({
@@ -771,7 +766,6 @@ export default function ProductPage() {
           description: productData.description,
           stock_type: productData.stock_type,
           color: productData.color,
-          size: productData.size || "",
           made_id: productData.made_id ? productData.made_id.toString() : "",
         })
         setExistingImages({
@@ -924,7 +918,6 @@ export default function ProductPage() {
       formDataToSend.append("description", editFormData.description)
       formDataToSend.append("stock_type", editFormData.stock_type)
       formDataToSend.append("color", editFormData.color)
-      formDataToSend.append("size", editFormData.size)
       formDataToSend.append("made_id", editFormData.made_id)
 
       if (editImageFiles.image1) {
@@ -975,7 +968,6 @@ export default function ProductPage() {
           description: "",
           stock_type: "",
           color: "",
-          size: "",
           made_id: "",
         })
         setEditImageFiles({
@@ -1610,34 +1602,51 @@ export default function ProductPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">Stock Type *</label>
-                <Input
-                  value={formData.stock_type}
-                  onChange={(e) => handleInputChange("stock_type", e.target.value)}
-                  placeholder="Enter stock type"
-                />
+                <Select value={formData.stock_type} onValueChange={(value) => handleInputChange("stock_type", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select stock type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ready Stock">Ready Stock</SelectItem>
+                    <SelectItem value="Sale Stock">Sale Stock</SelectItem>
+                    <SelectItem value="New Arrival">New Arrival</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Color *</label>
-                <Input
-                  value={formData.color}
-                  onChange={(e) => handleInputChange("color", e.target.value)}
-                  placeholder="Enter color"
-                />
+                <Select value={formData.color} onValueChange={(value) => handleInputChange("color", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select color" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Red">Red</SelectItem>
+                    <SelectItem value="Green">Green</SelectItem>
+                    <SelectItem value="Blue">Blue</SelectItem>
+                    <SelectItem value="Yellow">Yellow</SelectItem>
+                    <SelectItem value="Cyan">Cyan</SelectItem>
+                    <SelectItem value="Magenta">Magenta</SelectItem>
+                    <SelectItem value="Black">Black</SelectItem>
+                    <SelectItem value="White">White</SelectItem>
+                    <SelectItem value="Gray">Gray</SelectItem>
+                    <SelectItem value="Orange">Orange</SelectItem>
+                    <SelectItem value="Purple">Purple</SelectItem>
+                    <SelectItem value="Pink">Pink</SelectItem>
+                    <SelectItem value="Brown">Brown</SelectItem>
+                    <SelectItem value="Lime">Lime</SelectItem>
+                    <SelectItem value="Olive">Olive</SelectItem>
+                    <SelectItem value="Teal">Teal</SelectItem>
+                    <SelectItem value="Navy">Navy</SelectItem>
+                    <SelectItem value="Maroon">Maroon</SelectItem>
+                    <SelectItem value="Silver">Silver</SelectItem>
+                    <SelectItem value="Gold">Gold</SelectItem>
+                    <SelectItem value="Beige">Beige</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium">Size</label>
-                <Input
-                  value={formData.size}
-                  onChange={(e) => handleInputChange("size", e.target.value)}
-                  placeholder="e.g., S, M, L, XL or 40x60cm"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium">Made By</label>
                 <Select value={formData.made_id} onValueChange={(value) => handleInputChange("made_id", value)}>
@@ -1852,34 +1861,54 @@ export default function ProductPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Stock Type *</label>
-                  <Input
+                  <Select
                     value={editFormData.stock_type}
-                    onChange={(e) => handleEditInputChange("stock_type", e.target.value)}
-                    placeholder="Enter stock type"
-                  />
+                    onValueChange={(value) => handleEditInputChange("stock_type", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stock type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ready Stock">Ready Stock</SelectItem>
+                      <SelectItem value="Sale Stock">Sale Stock</SelectItem>
+                      <SelectItem value="New Arrival">New Arrival</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Color *</label>
-                  <Input
-                    value={editFormData.color}
-                    onChange={(e) => handleEditInputChange("color", e.target.value)}
-                    placeholder="Enter color"
-                  />
+                  <Select value={editFormData.color} onValueChange={(value) => handleEditInputChange("color", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select color" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Red">Red</SelectItem>
+                      <SelectItem value="Green">Green</SelectItem>
+                      <SelectItem value="Blue">Blue</SelectItem>
+                      <SelectItem value="Yellow">Yellow</SelectItem>
+                      <SelectItem value="Cyan">Cyan</SelectItem>
+                      <SelectItem value="Magenta">Magenta</SelectItem>
+                      <SelectItem value="Black">Black</SelectItem>
+                      <SelectItem value="White">White</SelectItem>
+                      <SelectItem value="Gray">Gray</SelectItem>
+                      <SelectItem value="Orange">Orange</SelectItem>
+                      <SelectItem value="Purple">Purple</SelectItem>
+                      <SelectItem value="Pink">Pink</SelectItem>
+                      <SelectItem value="Brown">Brown</SelectItem>
+                      <SelectItem value="Lime">Lime</SelectItem>
+                      <SelectItem value="Olive">Olive</SelectItem>
+                      <SelectItem value="Teal">Teal</SelectItem>
+                      <SelectItem value="Navy">Navy</SelectItem>
+                      <SelectItem value="Maroon">Maroon</SelectItem>
+                      <SelectItem value="Silver">Silver</SelectItem>
+                      <SelectItem value="Gold">Gold</SelectItem>
+                      <SelectItem value="Beige">Beige</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Size</label>
-                  <Input
-                    value={editFormData.size}
-                    onChange={(e) => handleEditInputChange("size", e.target.value)}
-                    placeholder="e.g., S, M, L, XL or 40x60cm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Made By</label>
                   <Select
