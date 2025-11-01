@@ -36,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 // Define API base URL using environment variables
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
@@ -134,7 +135,7 @@ export default function ProductPage() {
     brand_id: "",
     category_id: "",
     description: "",
-    stock_type: "",
+    product_type: "",
     color: "",
     made_id: "",
   })
@@ -171,12 +172,12 @@ export default function ProductPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [editFormData, setEditFormData] = useState({
-    id: 0,
+    id: "",
     name: "",
     brand_id: "",
     category_id: "",
     description: "",
-    stock_type: "",
+    product_type: "",
     color: "",
     made_id: "",
   })
@@ -379,7 +380,7 @@ export default function ProductPage() {
       formDataToSend.append("brand_id", formData.brand_id)
       formDataToSend.append("category_id", formData.category_id)
       formDataToSend.append("description", formData.description)
-      formDataToSend.append("stock_type", formData.stock_type)
+      formDataToSend.append("product_type", formData.product_type)
       formDataToSend.append("color", formData.color)
       formDataToSend.append("made_id", formData.made_id)
 
@@ -428,7 +429,7 @@ export default function ProductPage() {
           brand_id: "",
           category_id: "",
           description: "",
-          stock_type: "",
+          product_type: "",
           color: "",
           made_id: "",
         })
@@ -759,12 +760,12 @@ export default function ProductPage() {
       if (data.success) {
         const productData = data.data
         setEditFormData({
-          id: productData.id,
+          id: productData.id.toString(),
           name: productData.name,
           brand_id: productData.brand_id.toString(),
           category_id: productData.category_id.toString(),
           description: productData.description,
-          stock_type: productData.stock_type,
+          product_type: productData.product_type,
           color: productData.color,
           made_id: productData.made_id ? productData.made_id.toString() : "",
         })
@@ -869,10 +870,10 @@ export default function ProductPage() {
       return
     }
 
-    if (!editFormData.stock_type.trim()) {
+    if (!editFormData.product_type.trim()) {
       setNotification({
         show: true,
-        message: "Stock type is required",
+        message: "Product Type is required",
         type: "error",
       })
       setTimeout(() => {
@@ -916,7 +917,7 @@ export default function ProductPage() {
       formDataToSend.append("brand_id", editFormData.brand_id)
       formDataToSend.append("category_id", editFormData.category_id)
       formDataToSend.append("description", editFormData.description)
-      formDataToSend.append("stock_type", editFormData.stock_type)
+      formDataToSend.append("product_type", editFormData.product_type)
       formDataToSend.append("color", editFormData.color)
       formDataToSend.append("made_id", editFormData.made_id)
 
@@ -961,12 +962,12 @@ export default function ProductPage() {
         }, 3000)
 
         setEditFormData({
-          id: 0,
+          id: "",
           name: "",
           brand_id: "",
           category_id: "",
           description: "",
-          stock_type: "",
+          product_type: "",
           color: "",
           made_id: "",
         })
@@ -1600,11 +1601,14 @@ export default function ProductPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="text-sm font-medium">Stock Type *</label>
-                <Select value={formData.stock_type} onValueChange={(value) => handleInputChange("stock_type", value)}>
+              <div className="grid gap-2">
+                <Label htmlFor="product-type">Product Type *</Label>
+                <Select
+                  value={formData.product_type}
+                  onValueChange={(value) => handleInputChange("product_type", value)}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select stock type" />
+                    <SelectValue placeholder="Select product type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Ready Stock">Ready Stock</SelectItem>
@@ -1859,14 +1863,14 @@ export default function ProductPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Stock Type *</label>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-product-type">Product Type *</Label>
                   <Select
-                    value={editFormData.stock_type}
-                    onValueChange={(value) => handleEditInputChange("stock_type", value)}
+                    value={editFormData.product_type}
+                    onValueChange={(value) => handleEditInputChange("product_type", value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select stock type" />
+                      <SelectValue placeholder="Select product type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Ready Stock">Ready Stock</SelectItem>
