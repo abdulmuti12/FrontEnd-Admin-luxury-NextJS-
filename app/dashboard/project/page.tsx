@@ -35,6 +35,7 @@ import {
   CheckCircle,
   XCircle,
   X,
+  Loader2,
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Image from "next/image"
@@ -63,8 +64,8 @@ interface ProjectData {
   file10: string | null
   created_at: string
   updated_at: string
-  // Tambahkan field designer
-  designer: string | null
+  architect: string | null
+  photo_created: string | null
 }
 
 interface PaginationLink {
@@ -134,6 +135,9 @@ export default function ProjectPage() {
   const [apiError, setApiError] = useState("")
   const router = useRouter()
 
+  const [brands, setBrands] = useState<{ id: number; name: string }[]>([])
+  const [brandsLoading, setBrandsLoading] = useState(false)
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isCreatingProject, setIsCreatingProject] = useState(false)
   const [createMessage, setCreateMessage] = useState("")
@@ -143,8 +147,8 @@ export default function ProjectPage() {
     note: "",
     type: "image/video" as "image/video" | "text" | "mixed" | "web" | "mobile",
     brand_id: "",
-    // Tambahkan designer ke state newProject
-    designer: "",
+    architect: "",
+    photo_created: "",
   })
   const [projectFile, setProjectFile] = useState<File | null>(null)
   const [projectFile2, setProjectFile2] = useState<File | null>(null)
@@ -173,8 +177,8 @@ export default function ProjectPage() {
     note: "",
     type: "image/video" as "image/video" | "text" | "mixed" | "web" | "mobile",
     brand_id: "",
-    // Tambahkan designer ke state editProjectData
-    designer: "",
+    architect: "",
+    photo_created: "",
   })
   const [editProjectFile, setEditProjectFile] = useState<File | null>(null)
   const [editProjectFile2, setEditProjectFile2] = useState<File | null>(null)
@@ -366,7 +370,9 @@ export default function ProjectPage() {
           file10: null,
           created_at: data.data.general.created_at,
           updated_at: data.data.general.updated_at,
-          designer: data.data.general.designer,
+          // Mapped architect and photo_created from API response
+          architect: data.data.general.architect,
+          photo_created: data.data.general.photo_created,
         }
 
         setSelectedProject(detailProject)
@@ -403,6 +409,46 @@ export default function ProjectPage() {
 
     return () => clearTimeout(timeoutId)
   }, [searchValue, fetchProjects])
+
+  useEffect(() => {
+    if (isAddDialogOpen || isEditDialogOpen) {
+      fetchBrands()
+    }
+  }, [isAddDialogOpen, isEditDialogOpen])
+
+  // Fetch brands function
+  const fetchBrands = async () => {
+    setBrandsLoading(true)
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        console.error("[v0] Authentication token not found")
+        setBrandsLoading(false)
+        return
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admins/get-brand`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setBrands(data.data)
+      } else {
+        console.error("[v0] Failed to fetch brands:", data.message)
+      }
+    } catch (err) {
+      console.error("[v0] Error fetching brands:", err)
+    } finally {
+      setBrandsLoading(false)
+    }
+  }
 
   // Handle pagination
   const handlePageChange = (page: number) => {
@@ -557,8 +603,8 @@ export default function ProjectPage() {
         note: "",
         type: "image/video",
         brand_id: "",
-        // Reset designer
-        designer: "",
+        architect: "",
+        photo_created: "",
       })
       setProjectFile(null)
       setProjectFile2(null)
@@ -598,9 +644,12 @@ export default function ProjectPage() {
         formData.append("note", newProject.note)
       }
 
-      // Tambahkan designer ke formData
-      if (newProject.designer) {
-        formData.append("designer", newProject.designer)
+      if (newProject.architect) {
+        formData.append("architect", newProject.architect)
+      }
+
+      if (newProject.photo_created) {
+        formData.append("photo_created", newProject.photo_created)
       }
 
       if (projectFile) {
@@ -644,8 +693,8 @@ export default function ProjectPage() {
           note: "",
           type: "image/video",
           brand_id: "",
-          // Reset designer
-          designer: "",
+          architect: "",
+          photo_created: "",
         })
         setProjectFile(null)
         setProjectFile2(null)
@@ -675,8 +724,8 @@ export default function ProjectPage() {
 
   // Handle add form submission
   const handleAddProject = () => {
-    if (!newProject.name || !newProject.description || !newProject.brand_id) {
-      setCreateMessage("Please fill in all required fields (Name, Description, Brand ID)")
+    if (!newProject.name || !newProject.description) {
+      setCreateMessage("Please fill in all required fields (Name, Description)")
       return
     }
     createProject()
@@ -772,8 +821,9 @@ export default function ProjectPage() {
         note: project.note || "",
         type: project.type || "image/video",
         brand_id: project.brand_id || "",
-        // Set nilai designer dari data project
-        designer: project.designer || "",
+        // Set nilai architect and photo_created from data project
+        architect: project.architect || "",
+        photo_created: project.photo_created || "",
       })
       setCurrentProjectFile(project.file)
       setCurrentProjectFile2(project.file2)
@@ -872,8 +922,8 @@ export default function ProjectPage() {
         note: "",
         type: "image/video",
         brand_id: "",
-        // Reset designer
-        designer: "",
+        architect: "",
+        photo_created: "",
       })
       setEditProjectFile(null)
       setEditProjectFile2(null)
@@ -920,9 +970,12 @@ export default function ProjectPage() {
         formData.append("note", editProjectData.note)
       }
 
-      // Tambahkan designer ke formData
-      if (editProjectData.designer) {
-        formData.append("designer", editProjectData.designer)
+      if (editProjectData.architect) {
+        formData.append("architect", editProjectData.architect)
+      }
+
+      if (editProjectData.photo_created) {
+        formData.append("photo_created", editProjectData.photo_created)
       }
 
       if (editProjectFile) {
@@ -979,8 +1032,8 @@ export default function ProjectPage() {
 
   // Handle edit form submission
   const handleUpdateProject = () => {
-    if (!editProjectData.name || !editProjectData.description || !editProjectData.brand_id) {
-      setEditMessage("Please fill in all required fields (Name, Description, Brand ID)")
+    if (!editProjectData.name || !editProjectData.description) {
+      setEditMessage("Please fill in all required fields (Name, Description)")
       return
     }
     updateProject()
@@ -1204,24 +1257,51 @@ export default function ProjectPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="brand_id">Brand ID *</Label>
-                <Input
-                  id="brand_id"
+                <Label htmlFor="brand_id">Brand ID</Label>
+                <Select
                   value={newProject.brand_id}
-                  onChange={(e) => setNewProject({ ...newProject, brand_id: e.target.value })}
-                  placeholder="Enter brand ID"
+                  onValueChange={(value) => setNewProject({ ...newProject, brand_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={brandsLoading ? "Loading brands..." : "Select a brand (optional)"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brandsLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading...</span>
+                      </div>
+                    ) : brands.length > 0 ? (
+                      brands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id.toString()}>
+                          {brand.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-3 text-sm text-muted-foreground">No brands available</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="architect">Architect</Label>
+                <Input
+                  id="architect"
+                  value={newProject.architect}
+                  onChange={(e) => setNewProject({ ...newProject, architect: e.target.value })}
+                  placeholder="Enter architect name (optional)"
                   disabled={isCreatingProject}
                 />
               </div>
 
-              {/* Tambahkan Designer field di sini */}
               <div className="grid gap-2">
-                <Label htmlFor="designer">Designer</Label>
+                <Label htmlFor="photo_created">Photo Created</Label>
                 <Input
-                  id="designer"
-                  value={newProject.designer}
-                  onChange={(e) => setNewProject({ ...newProject, designer: e.target.value })}
-                  placeholder="Enter designer name (optional)"
+                  id="photo_created"
+                  value={newProject.photo_created}
+                  onChange={(e) => setNewProject({ ...newProject, photo_created: e.target.value })}
+                  placeholder="Enter photo creation date or info (optional)"
                   disabled={isCreatingProject}
                 />
               </div>
@@ -1716,12 +1796,22 @@ export default function ProjectPage() {
                         </div>
                       </div>
 
-                      {selectedProject.designer && (
+                      {selectedProject.architect && (
                         <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
                           <FolderOpen className="w-5 h-5 text-indigo-600" />
                           <div>
-                            <p className="text-sm font-medium text-slate-700">Designer</p>
-                            <p className="text-slate-900">{selectedProject.designer}</p>
+                            <p className="text-sm font-medium text-slate-700">Architect</p>
+                            <p className="text-slate-900">{selectedProject.architect}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedProject.photo_created && (
+                        <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg">
+                          <Calendar className="w-5 h-5 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-700">Photo Created</p>
+                            <p className="text-slate-900">{selectedProject.photo_created}</p>
                           </div>
                         </div>
                       )}
@@ -1998,24 +2088,51 @@ export default function ProjectPage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="edit-brand_id">Brand ID *</Label>
-                <Input
-                  id="edit-brand_id"
+                <Label htmlFor="edit-brand_id">Brand ID</Label>
+                <Select
                   value={editProjectData.brand_id}
-                  onChange={(e) => setEditProjectData({ ...editProjectData, brand_id: e.target.value })}
-                  placeholder="Enter brand ID"
+                  onValueChange={(value) => setEditProjectData({ ...editProjectData, brand_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={brandsLoading ? "Loading brands..." : "Select a brand (optional)"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {brandsLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm">Loading...</span>
+                      </div>
+                    ) : brands.length > 0 ? (
+                      brands.map((brand) => (
+                        <SelectItem key={brand.id} value={brand.id.toString()}>
+                          {brand.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-3 text-sm text-muted-foreground">No brands available</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-architect">Architect</Label>
+                <Input
+                  id="edit-architect"
+                  value={editProjectData.architect}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, architect: e.target.value })}
+                  placeholder="Enter architect name (optional)"
                   disabled={isEditingProject}
                 />
               </div>
 
-              {/* Tambahkan Designer field di sini */}
               <div className="grid gap-2">
-                <Label htmlFor="edit-designer">Designer</Label>
+                <Label htmlFor="edit-photo_created">Photo Created</Label>
                 <Input
-                  id="edit-designer"
-                  value={editProjectData.designer}
-                  onChange={(e) => setEditProjectData({ ...editProjectData, designer: e.target.value })}
-                  placeholder="Enter designer name (optional)"
+                  id="edit-photo_created"
+                  value={editProjectData.photo_created}
+                  onChange={(e) => setEditProjectData({ ...editProjectData, photo_created: e.target.value })}
+                  placeholder="Enter photo creation date or info (optional)"
                   disabled={isEditingProject}
                 />
               </div>
