@@ -136,6 +136,12 @@ export default function CategoryPage() {
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
   const [currentCategoryImage, setCurrentCategoryImage] = useState<string | null>(null)
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}`
+  : "http://127.0.0.1:8000/api/admins"
+
+
+
   // Toast notification functions
   const addToast = (type: "success" | "error", title: string, message: string) => {
     const id = Math.random().toString(36).substr(2, 9)
@@ -173,7 +179,8 @@ export default function CategoryPage() {
         params.append("name", value.trim())
       }
 
-      const url = `http://127.0.0.1:8000/api/admins/category${params.toString() ? `?${params.toString()}` : ""}`
+      const url = `${API_BASE_URL}/admins/category${params.toString() ? `?${params.toString()}` : ""}`
+
 
       console.log("Fetching categories from:", url)
 
@@ -351,7 +358,7 @@ export default function CategoryPage() {
     if (imagePath.startsWith("http")) return imagePath
 
     // Otherwise, construct the full URL
-    return `http://127.0.0.1:8000/storage/${imagePath}`
+    return `http://31.97.67.48:8000/storage/${imagePath}`
   }
 
   // Add this function to handle file input change
@@ -407,7 +414,7 @@ export default function CategoryPage() {
         formData.append("image", categoryImage)
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/category`, {
+      const response = await fetch(`${API_BASE_URL}/admins/category`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -489,7 +496,7 @@ export default function CategoryPage() {
       setIsDeletingCategory(true)
       setDeleteMessage("")
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/category/${categoryToDelete.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admins/category/${categoryToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -628,7 +635,7 @@ export default function CategoryPage() {
         formData.append("image", editCategoryImage)
       }
 
-      const response = await fetch(`http://127.0.0.1:8000/api/admins/category/${categoryToEdit.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admins/category/${categoryToEdit.id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
